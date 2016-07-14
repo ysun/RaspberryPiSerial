@@ -177,6 +177,7 @@ void parseData(unsigned char *comdata)
 			break;
 		} else {
 			string_end ++;
+			string_end = string_end % MAX_QUEUE;
 		}
 	}
 
@@ -508,6 +509,7 @@ void GetCOM_Data()
 		parseData(comdata);
 
 		processMotor();
+
 		Serial.print("\r\n  * ");
 		Serial.print(cmd.data.mode);
 		Serial.print(", ");
