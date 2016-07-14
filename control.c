@@ -10,17 +10,22 @@
 #include <termios.h>
 #include <stdlib.h>
 
-int fd; //For serial device
+#define SETBITSPEED(opt, s)		\
+do					\
+{					\
+	cfsetispeed(&(opt), B##s);	\
+	cfsetospeed(&(opt), B##s);	\
+} while(0)
 
 union PARA
 {
 	char c[4];
-	int d;
+	long int d;
 };
 union CMD
 {
 	char c[4];
-	int d;
+	long int d;
 	struct {
 		char flag[2];
 		char cmd;
@@ -28,18 +33,42 @@ union CMD
 	};
 };
 
-int initSerial()
-{
-	fd = open("/dev/ttySAC1", O_RDWR | O_NOCTTY | O_NDELAY);
-	//O_RDWR 读写方式打开；
-	//O_NOCTTY 不允许进程管理串口（不太理解，一般都选上）；
-	//O_NDELAY 非阻塞（默认为阻塞，打开后也可以使用fcntl()重新设置）
-	return 0;
-}
-int finalSerial()
-{
-	close(fd);
-	return 0;
+void testfunction(int fd){
+	union CMD cmd;
+	union PARA para[4];
+	int nread;
+	char buff[20];
+
+	int i, j;
+	memset(&cmd, 0, 4);
+	memset(&para, 0, 16);
+
+	cmd.flag[0] = 0xff;
+	cmd.flag[1] = 0xff;
+	cmd.cmd = 'A';
+	cmd.rev = 0;
+
+	for(i = 0; i < 3; i++)
+		para[i].d = 500;
+	para[4].d = 0x0000;
+	
+	memcpy(buff, cmd.c, 4);
+	memcpy(buff+4, para, 16);
+
+	for(j = 0; j < 20; j++)
+		printf("%x,", buff[j]);
+
+	printf("\n");
+	//for(i = 0; i < 5; i++)
+	write(fd, buff, 20);
+//	write(fd, cmd.c, 4);
+//	for(i = 0; i < 4; i++)
+//		write(fd, para[i].c, 4);
+
+//	nread = read(fd,buff,20);
+//	printf("nread=%d,%s\n", nread, buff);
+
+
 }
 
 int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
@@ -54,6 +83,29 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 
 	bzero( &newtio, sizeof( newtio ) );
 
+	/*
+	   struct termios options;  // 串口配置结构体
+	   tcgetattr(fd,&options); //获取当前设置
+	   bzero(&options,sizeof(options));
+
+	   options.c_cflag  |= B115200 | CLOCAL | CREAD; // 设置波特率，本地连接，接收使能
+	   options.c_cflag &= ~CSIZE; //屏蔽数据位
+	   options.c_cflag  |= CS8; // 数据位为 8 ，CS7 for 7 
+	   options.c_cflag &= ~CSTOPB; // 一位停止位， 两位停止为 |= CSTOPB
+	   options.c_cflag &= ~PARENB;  // 无校验
+	   //options.c_cflag |= PARENB; // 有校验
+	   //options.c_cflag &= ~PARODD;// 偶校验
+	   //options.c_cflag |= PARODD; // 奇校验
+
+	   options.c_cc[VTIME] = 0; // 等待时间，单位百毫秒 （读）。后有详细说明
+	   options.c_cc[VMIN] = 0; // 最小字节数 （读）。后有详细说明
+	   tcflush(fd, TCIOFLUSH); // TCIFLUSH刷清输入队列。
+	   TCOFLUSH刷清输出队列。 
+	   TCIOFLUSH刷清输入、输出队列。
+	   tcsetattr(fd, TCSANOW, &options); // TCSANOW立即生效；
+	   TCSADRAIN：Wait until everything has been transmitted；
+	   TCSAFLUSH：Flush input and output buffers and make the change
+	*/
 	newtio.c_cflag |= CLOCAL | CREAD; 
 	newtio.c_cflag &= ~CSIZE; 
 
@@ -84,29 +136,7 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 			break;
 	}
 
-	switch( nSpeed )
-	{
-		case 2400:
-			cfsetispeed(&newtio, B2400);
-			cfsetospeed(&newtio, B2400);
-			break;
-		case 4800:
-			cfsetispeed(&newtio, B4800);
-			cfsetospeed(&newtio, B4800);
-			break;
-		case 9600:
-			cfsetispeed(&newtio, B9600);
-			cfsetospeed(&newtio, B9600);
-			break;
-		case 115200:
-			cfsetispeed(&newtio, B115200);
-			cfsetospeed(&newtio, B115200);
-			break;
-		default:
-			cfsetispeed(&newtio, B9600);
-			cfsetospeed(&newtio, B9600);
-			break;
-	}
+	SETBITSPEED(newtio, 9600);
 
 	if( nStop == 1 )
 		newtio.c_cflag &= ~CSTOPB;
@@ -127,45 +157,24 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 	printf("set done!\n");
 	return 0;
 }
-int open_port(int fd,int comport)
+int open_port(char const *dev)
 {
 	/* fd 打开串口 comport表示第几个串口 */
-	char *dev[]={"/dev/ttyS0","/dev/ttyS1","/dev/ttyS2"};
-	long vdisable;
-	if (comport==1)
-	{    fd = open( "/dev/ttyS0", O_RDWR|O_NOCTTY|O_NDELAY);
-		if (-1 == fd){
-			perror("Can't Open Serial Port");
-			return(-1);
-		}
-		else 
-			printf("open ttyS0 .....\n");
-	}
-	else if(comport==2)
-	{    fd = open( "/dev/ttyS1", O_RDWR|O_NOCTTY|O_NDELAY);
+	int fd = open(dev, O_RDWR|		//O_RDWR 读写方式打开；
+			   O_NOCTTY|		//O_NOCTTY 不允许进程管理串口（不太理解，一般都选上）；
+			   O_NDELAY);		//O_NDELAY 非阻塞（默认为阻塞，打开后也可以使用fcntl()重新设置）
 
-		if (-1 == fd){
-			perror("Can't Open Serial Port");
-			return(-1);
-		}
-		else 
-			printf("open ttyS1 .....\n");
+	if (-1 == fd){
+		perror("Can't Open Serial Port");
+		return(-1);
 	}
-	else if (comport==3)
-	{
-		fd = open( "/dev/ttyS2", O_RDWR|O_NOCTTY|O_NDELAY);
-		if (-1 == fd){
-			perror("Can't Open Serial Port");
-			return(-1);
-		}
-		else 
-			printf("open ttyS2 .....\n");
-	}
+	else 
+		printf("open %s .....\n", dev);
 
-	if(fcntl(fd, F_SETFL, 0)<0)
+	if(fcntl(fd, F_SETFL, 0) < 0)
 		printf("fcntl failed!\n");
 	else
-		printf("fcntl=%d\n",fcntl(fd, F_SETFL,0));
+		printf("fcntl=%d\n", fcntl(fd, F_SETFL,0));
 
 	if(isatty(STDIN_FILENO)==0)
 		printf("standard input is not a terminal device\n");
@@ -179,9 +188,14 @@ int open_port(int fd,int comport)
 int main(int argc, char **argv)  
 {  
 	int ch;  
-	char buff[]="Hello\n";
+	char buff[1024] = {0};
 	int nread,i;
+	char *dev[]={"/dev/ttyUSB0","/dev/ttyS1","/dev/ttyS2"};
+	int fd; //For serial device
 
+	///////////////////////
+	// Command options
+	//
 	opterr = 0;  
 	while ((ch = getopt(argc, argv, "a:bcde")) != -1)  
 	{  
@@ -197,23 +211,34 @@ int main(int argc, char **argv)
 		}  
 		printf("opt [%c] with optopt: %s\n", ch, optarg);	
 	}
+	//////////////////////
 
 
-	if((fd = open_port(fd,1)) < 0){
+	//////////////////////////
+	// Open serial port
+	// By default open ttyUSB0
+	//
+	if((fd = open_port(dev[0])) < 0){
 		perror("open_port error");
-		return;
+		return -1;
 	}
 
-	if((i=set_opt(fd,115200,8,'N',1))<0){
+	//////////////////////////
+	// Set serial port
+	//
+	if((i=set_opt(fd,9600,8,'N',1))<0){
 		perror("set_opt error");
-		return;
+		return -2;
 	}
-	printf("fd=%d\n",fd);
-	//    fd=3;
-	nread=read(fd,buff,8);
-	printf("nread=%d,%s\n",nread,buff);
+
+
+	testfunction(fd);	
+//	while(1){
+//		nread = read(fd,buff,8);
+//		printf("nread=%d,%s\n", nread, buff);
+//	}
+
 	close(fd);
-	return;
 
 	return 0;
 }
