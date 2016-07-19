@@ -24,7 +24,7 @@ union PARA
 {
 	char c[4];
 	long int d;
-};
+} para[4];
 union CMD
 {
 	char c[4];
@@ -34,7 +34,41 @@ union CMD
 		char cmd;
 		char rev;
 	};
-};
+} cmd;
+
+char buff[20];
+void do_run_cmd(int fd, char buff[20]){
+	write(fd, buff, 20);
+}
+
+void fill_cmd_head(union CMD *cmd){
+	cmd->flag[0] = 0xee;
+	cmd->flag[1] = 0xee;
+	cmd->rev = 0;
+}
+
+void fill_data_tail(union PARA *para){
+	para->d = CMD_SUFFIX;
+}
+
+void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
+	int i, j;
+	fill_cmd_head(cmd);
+
+	fill_data_tail(&para[3]);
+
+
+	memcpy(buff, cmd->c, 4);
+	memcpy(buff+4, para, 16);
+
+	for(j = 0; j < 20; j++)
+		printf("%x,", buff[j]);
+
+	printf("\n");
+
+	do_run_cmd(fd, buff);
+}
+
 
 void testfunction(int fd){
 	union CMD cmd;
@@ -193,17 +227,33 @@ int main(int argc, char **argv)
 	char *dev[]={"/dev/ttyUSB0"};
 	int fd; //For serial device
 
+	memset(&cmd, 0, 4);
+	memset(para, 0, 16);
+
+
 	///////////////////////
 	// Command options
 	//
 	opterr = 0;  
-	while ((ch = getopt(argc, argv, "a:bcde")) != -1)  
+	while ((ch = getopt(argc, argv, "m:x:y:z:l:")) != -1)  
 	{  
 		switch(ch)  
 		{  
-			case 'a':  
+			case 'm':  
+				cmd.cmd = optarg[0];
 				break;	
-			case 'b':  
+			case 'x':  
+				para[0].d = atoi(optarg);
+				break;	
+			case 'y':  
+				para[1].d = atoi(optarg);
+				break;	
+			case 'z':  
+				para[2].d = atoi(optarg);
+				break;	
+			case 'l':  
+				sscanf(optarg, "%c,%ld,%ld,%ld",
+						&cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
 				break;	
 			case '?':
 			default:
@@ -232,7 +282,8 @@ int main(int argc, char **argv)
 	}
 
 
-	testfunction(fd);	
+	run_cmd(fd, &cmd, para);
+	//testfunction(fd);	
 
 	close(fd);
 
