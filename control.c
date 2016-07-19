@@ -17,6 +17,9 @@ do					\
 	cfsetospeed(&(opt), B##s);	\
 } while(0)
 
+#define CMD_PREFIX	0xeeee
+#define CMD_SUFFIX	0xdddddddd
+
 union PARA
 {
 	char c[4];
@@ -43,14 +46,16 @@ void testfunction(int fd){
 	memset(&cmd, 0, 4);
 	memset(&para, 0, 16);
 
-	cmd.flag[0] = 0xff;
-	cmd.flag[1] = 0xff;
-	cmd.cmd = 'A';
+	cmd.flag[0] = 0xee;
+	cmd.flag[1] = 0xee;
+
+	cmd.cmd = 'B';
 	cmd.rev = 0;
 
 	for(i = 0; i < 3; i++)
 		para[i].d = 500;
-	para[4].d = 0x0000;
+
+	para[3].d = CMD_SUFFIX;
 	
 	memcpy(buff, cmd.c, 4);
 	memcpy(buff+4, para, 16);
@@ -59,21 +64,14 @@ void testfunction(int fd){
 		printf("%x,", buff[j]);
 
 	printf("\n");
-	//for(i = 0; i < 5; i++)
+
 	write(fd, buff, 20);
-//	write(fd, cmd.c, 4);
-//	for(i = 0; i < 4; i++)
-//		write(fd, para[i].c, 4);
-
-//	nread = read(fd,buff,20);
-//	printf("nread=%d,%s\n", nread, buff);
-
-
 }
 
 int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 {
 	/* 五个参量 fd打开文件 speed设置波特率 bit数据位设置   neent奇偶校验位 stop停止位 */
+
 	struct termios newtio,oldtio;
 
 	if ( tcgetattr( fd,&oldtio) != 0) { 
@@ -83,29 +81,6 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 
 	bzero( &newtio, sizeof( newtio ) );
 
-	/*
-	   struct termios options;  // 串口配置结构体
-	   tcgetattr(fd,&options); //获取当前设置
-	   bzero(&options,sizeof(options));
-
-	   options.c_cflag  |= B115200 | CLOCAL | CREAD; // 设置波特率，本地连接，接收使能
-	   options.c_cflag &= ~CSIZE; //屏蔽数据位
-	   options.c_cflag  |= CS8; // 数据位为 8 ，CS7 for 7 
-	   options.c_cflag &= ~CSTOPB; // 一位停止位， 两位停止为 |= CSTOPB
-	   options.c_cflag &= ~PARENB;  // 无校验
-	   //options.c_cflag |= PARENB; // 有校验
-	   //options.c_cflag &= ~PARODD;// 偶校验
-	   //options.c_cflag |= PARODD; // 奇校验
-
-	   options.c_cc[VTIME] = 0; // 等待时间，单位百毫秒 （读）。后有详细说明
-	   options.c_cc[VMIN] = 0; // 最小字节数 （读）。后有详细说明
-	   tcflush(fd, TCIOFLUSH); // TCIFLUSH刷清输入队列。
-	   TCOFLUSH刷清输出队列。 
-	   TCIOFLUSH刷清输入、输出队列。
-	   tcsetattr(fd, TCSANOW, &options); // TCSANOW立即生效；
-	   TCSADRAIN：Wait until everything has been transmitted；
-	   TCSAFLUSH：Flush input and output buffers and make the change
-	*/
 	newtio.c_cflag |= CLOCAL | CREAD; 
 	newtio.c_cflag &= ~CSIZE; 
 
@@ -146,13 +121,38 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 	newtio.c_cc[VTIME] = 0;
 	newtio.c_cc[VMIN] = 0;
 
-	tcflush(fd,TCIFLUSH);
+	tcflush(fd,TCIOFLUSH);
 
 	if((tcsetattr(fd,TCSANOW,&newtio))!=0)
 	{
 		perror("com set error");
 		return -1;
 	}
+
+/*
+	   struct termios options;  // 串口配置结构体
+	   tcgetattr(fd,&options); //获取当前设置
+	   bzero(&options,sizeof(options));
+
+	   options.c_cflag  |= B9600 | CLOCAL | CREAD; // 设置波特率，本地连接，接收使能
+	   options.c_cflag &= ~CSIZE; //屏蔽数据位
+	   options.c_cflag  |= CS8; // 数据位为 8 ，CS7 for 7 
+	   options.c_cflag &= ~CSTOPB; // 一位停止位， 两位停止为 |= CSTOPB
+	   options.c_cflag &= ~PARENB;  // 无校验
+	   //options.c_cflag |= PARENB; // 有校验
+	   //options.c_cflag &= ~PARODD;// 偶校验
+	   //options.c_cflag |= PARODD; // 奇校验
+
+	   options.c_cc[VTIME] = 0; // 等待时间，单位百毫秒 （读）。后有详细说明
+	   options.c_cc[VMIN] = 0; // 最小字节数 （读）。后有详细说明
+	   tcflush(fd, TCIOFLUSH); // TCIFLUSH刷清输入队列。
+	   				//TCOFLUSH刷清输出队列。 
+					//TCIOFLUSH刷清输入、输出队列。
+	   tcsetattr(fd, TCSANOW, &options); // TCSANOW立即生效；
+	   					//TCSADRAIN：Wait until everything has been transmitted；
+						//TCSAFLUSH：Flush input and output buffers and make the change
+
+*/
 
 	printf("set done!\n");
 	return 0;
@@ -190,7 +190,7 @@ int main(int argc, char **argv)
 	int ch;  
 	char buff[1024] = {0};
 	int nread,i;
-	char *dev[]={"/dev/ttyUSB0","/dev/ttyS1","/dev/ttyS2"};
+	char *dev[]={"/dev/ttyUSB0"};
 	int fd; //For serial device
 
 	///////////////////////
@@ -233,10 +233,6 @@ int main(int argc, char **argv)
 
 
 	testfunction(fd);	
-//	while(1){
-//		nread = read(fd,buff,8);
-//		printf("nread=%d,%s\n", nread, buff);
-//	}
 
 	close(fd);
 
