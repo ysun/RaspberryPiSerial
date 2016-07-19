@@ -45,19 +45,19 @@ int distance_x,distance_y,distance_z;   //x，y，z方向所需移动位移
 int DISSWANG_X=95;                      //50轨道
 int DISSWANG_Y=75;                      //45轨道
 int DISSWANG_Z=95;                     //50轨道
-int pulse_rate_x=4000;                //x方向电机旋转一圈所需脉冲数
-int pulse_rate_y=400;                //y方向电机旋转一圈所需脉冲数
-int pulse_rate_z=4000;              //z方向电机旋转一圈所需脉冲数
+int pulse_rate_x = 800;                //x方向电机旋转一圈所需脉冲数
+int pulse_rate_y = 220;                //y方向电机旋转一圈所需脉冲数
+int pulse_rate_z = 400;              //z方向电机旋转一圈所需脉冲数
 
-int delay_lowlevenum_xlow=250;          //x方向电机低速低电平脉冲延迟数
-int delay_lowlevenum_xmid=150;          //x方向电机低速中电平脉冲延迟数
-int delay_lowlevenum_xhig=100;          //x方向电机低速高电平脉冲延迟数
-int delay_lowlevenum_ylow=150;          //y方向电机低速低电平脉冲延迟数
-int delay_lowlevenum_ymid=100;          //y方向电机低速中电平脉冲延迟数
-int delay_lowlevenum_yhig=75;          //y方向电机低速高电平脉冲延迟数
-int delay_lowlevenum_zlow=250;          //z方向电机低速低电平脉冲延迟数
-int delay_lowlevenum_zmid=150;          //z方向电机低速中电平脉冲延迟数
-int delay_lowlevenum_zhig=100;          //z方向电机低速高电平脉冲延迟数
+int delay_lowlevenum_xlow=15;          //x方向电机低速低电平脉冲延迟数
+int delay_lowlevenum_xmid=15;          //x方向电机低速中电平脉冲延迟数
+int delay_lowlevenum_xhig=15;          //x方向电机低速高电平脉冲延迟数
+int delay_lowlevenum_ylow=30;          //y方向电机低速低电平脉冲延迟数
+int delay_lowlevenum_ymid=30;          //y方向电机低速中电平脉冲延迟数
+int delay_lowlevenum_yhig=30;          //y方向电机低速高电平脉冲延迟数
+int delay_lowlevenum_zlow=60;          //z方向电机低速低电平脉冲延迟数
+int delay_lowlevenum_zmid=60;          //z方向电机低速中电平脉冲延迟数
+int delay_lowlevenum_zhig=60;          //z方向电机低速高电平脉冲延迟数
 
 
 //串口数据
@@ -161,18 +161,27 @@ void setup() {
 
 int g_inputCount = 0;
 
+void printData(unsigned char *comdata)
+{
+	int i = 0;
+	Serial.print("\r\n");
+
+	for(; i < 20; i++) {
+		Serial.print(comdata[string_end + i], HEX);
+		Serial.print(" ");
+	}
+	Serial.print("\r\n");
+
+}
 void parseData(unsigned char *comdata)
 {
 	bool found_head = false;
 
-	//if(comdata[string_head % 512]==0xff && comdata[(string_head+1) % 512]==0xff)
-	Serial.print(cmd.data.flag[0],HEX);
-	Serial.print(", ");
-	Serial.print(cmd.data.flag[1],HEX);
+	printData(comdata);
 
 	while( (string_head + 1) % MAX_QUEUE != string_end )
 	{
-		if(comdata[string_end] == 0xff && comdata[string_end + 1] == 0xff){
+		if(comdata[string_end] == 0xee && comdata[string_end + 1] == 0xee){
 			found_head = true; 
 			break;
 		} else {
@@ -367,12 +376,10 @@ void dmotor(int s_x,int s_y,int s_z)
      }
 
      //将距离转换为脉冲数
-     unsigned int pulse_x=int(s_x_abs * (4000.0 / DISSWANG_X));
-     unsigned int pulse_y=int(s_y_abs * (400.0 / DISSWANG_Y));
-     unsigned int pulse_z=int(s_z_abs * (4000.0 / DISSWANG_Z));
-     Serial.println(pulse_x);
-     Serial.println(pulse_y);
-     Serial.println(pulse_z);
+     unsigned int pulse_x=int(s_x_abs * (800.0 / DISSWANG_X));
+     unsigned int pulse_y=int(s_y_abs * (220.0 / DISSWANG_Y));
+     unsigned int pulse_z=int(s_z_abs * (400.0 / DISSWANG_Z));
+
      //分别获得x,y,z方向频率
      GetFreData('x',pulse_x,tf_x);
      GetFreData('y',pulse_y,tf_y);
@@ -440,7 +447,7 @@ void processMotor()
 
 			dmotor(distance_x,distance_y,distance_z);       //电机驱动
 
-			Serial.println("Here !!!!!");
+			Serial.println("Here A !!!!!");
 			break;
 		case 'B':                     //move:输入的x,y,z是相对坐标
 			distance_x=para[0].d;
@@ -451,6 +458,7 @@ void processMotor()
 			objpos_z=distance_z+curpos_z;               //所需运行位移
 
 			dmotor(distance_x,distance_y,distance_z);       //电机驱动
+			Serial.println("Here B !!!!!");
 			break;
 		case 'C':                     //stop:电机停止
 			void stop_motor(); 
@@ -464,7 +472,6 @@ void processMotor()
 			time_data[2] = char(value_time_2);
 			value_time_3=EEPROM.read(address_time_3);
 			time_data[3] = char(value_time_3);
-//			Serial.println(time_data);
 			memset(time_data, 0, 4);
 			break;       
 	}
@@ -489,10 +496,10 @@ void GetCOM_Data()
 		comdata[string_head] = Serial.read();
 		printChar( comdata[string_head] );
 
-		if(comdata[string_head] == 0 &&
-			comdata[string_head-1] == 0 &&
-			comdata[string_head-2] == 0 &&
-			comdata[string_head-3] == 0 )
+		if(comdata[string_head] == 0xdd &&
+			comdata[string_head-1] == 0xdd &&
+			comdata[string_head-2] == 0xdd &&
+			comdata[string_head-3] == 0xdd )
 
 			g_processFlag = true;
 
@@ -504,19 +511,9 @@ void GetCOM_Data()
 
 	while (string_head != string_end && g_processFlag)
 	{
-		int n = 0;
-
 		parseData(comdata);
 
 		processMotor();
-
-		Serial.print("\r\n  * ");
-		Serial.print(cmd.data.mode);
-		Serial.print(", ");
-		for(n = 0; n<4; n++){
-			Serial.print(para[n].d);
-			Serial.print(", ");
-		}
 
 //		string_end = (string_end + CMD_SIZE)&MAX_QUEUE;
 	}
@@ -527,6 +524,8 @@ void loop() {
 
 	// put your main code here, to run repeatedly:
 	GetCOM_Data();
+
+//	dmotor(500, 500, 500);       //电机驱动
 
 	//根据获得的运动模式指令，确定运行方式
 }
