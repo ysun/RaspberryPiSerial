@@ -8,14 +8,14 @@
 #define PIN_ENABLE 8
 
 #define PIN_INTER 3          
-#define PIN_INTER_RIGHT 9    
-#define PIN_INTER_LEFT 10   
+#define PIN_INTER_RIGHT 10 
+#define PIN_INTER_LEFT 9
 
 #define TRAN_RATION_X 95
 #define TRAN_RATION_Y 75
 #define TRAN_RATION_Z 95
 #define DELAY_TF_X 200
-#define DELAY_TF_Y 400
+#define DELAY_TF_Y 800
 #define DELAY_TF_Z 200
 
 #define PULSE_RATE_X 800
@@ -25,8 +25,8 @@
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
 
-#define ACC_TIME 10000            //acclebrate 10ms
-#define MAX_DELAY 1000
+#define ACC_TIME 160000            //acclebrate 10ms
+#define MAX_DELAY 2000
 
 #define SORT 'y'
 //EEPROM寄存器保存的高低位数
@@ -96,18 +96,18 @@ void blink()
      stop_motor();
      
      inter_stop = true;
-     int val_right = digitalRead(PIN_INTER_RIGHT);
-     int val_left = digitalRead(PIN_INTER_LEFT);
-     if(val_right)
-     {
-         digitalWrite(PIN_DIR, HIGH);
-         return;
-     }
-     if(val_left)
-     {
-         digitalWrite(PIN_DIR, LOW);
-         return;
-     }
+//     int val_right = digitalRead(PIN_INTER_RIGHT);
+//     int val_left = digitalRead(PIN_INTER_LEFT);
+//     if(val_right)
+//     {
+//         digitalWrite(PIN_DIR, HIGH);
+//         return;
+//     }
+//     if(val_left)
+//     {
+//         digitalWrite(PIN_DIR, LOW);
+//         return;
+//     }
      Serial.println(" blink:");
 }
 
@@ -118,7 +118,6 @@ void setup() {
 	pinMode(PIN_DIR,OUTPUT);
 	pinMode(PIN_ENABLE,OUTPUT);
 
-	pinMode(PIN_INTER,OUTPUT);
 	pinMode(PIN_INTER_RIGHT,OUTPUT);
 	pinMode(PIN_INTER_LEFT,OUTPUT);
 
@@ -237,14 +236,31 @@ void Accelerate_Launch(unsigned int & n, int tf)
       for(int i = MAX_DELAY; i > tf;)
       {
             digitalWrite(PIN_PULS, LOW);
-            delay(i);
+            delayMicroseconds(i);
             digitalWrite(PIN_PULS, HIGH);
-            delay(i);
+            delayMicroseconds(i);
             i = i - d;
             n--;
       }     
 }
+int speedUp(int countStep){
+      int i = 0;
+      float tdelay = 350;
+      for(i = 0; i < countStep; i++)
+      {
+            Serial.print("tdelay:");
+            Serial.println(tdelay);
 
+            for(int j = 0; j < 100; j++){
+		    digitalWrite(PIN_PULS, LOW);
+		    delayMicroseconds(int(tdelay));
+		    digitalWrite(PIN_PULS, HIGH);
+		    delayMicroseconds(int(tdelay));
+            }
+            tdelay = tdelay - 6.25;
+      }
+      return tdelay;
+}
 /*
  * 电机驱动;
  * int & n:需要的脉冲数; 
@@ -253,7 +269,7 @@ void Accelerate_Launch(unsigned int & n, int tf)
 void motor(unsigned int  & n, int tf)
 {
     //电机加速启动
-//    Accelerate_Launch(n, tf);
+    //Accelerate_Launch(n, tf);
     //电机转动
     for(; n > 0 && inter_stop == false; n--)
     {
@@ -478,7 +494,38 @@ void GetCOM_Data()
 void loop() {
 
 	// put your main code here, to run repeatedly:
-	GetCOM_Data();
+//	GetCOM_Data();
+        digitalWrite(PIN_ENABLE,LOW);
+        digitalWrite(PIN_DIR,LOW);
+	int endduring = speedUp(16);
+
+	Serial.print("endduring:");
+	Serial.println(endduring, DEC);
+
+      for(int i = 0; i < 1600; i++)
+      {
+            digitalWrite(PIN_PULS, LOW);
+            delayMicroseconds(endduring);
+            digitalWrite(PIN_PULS, HIGH);
+            delayMicroseconds(endduring);
+      }
+
+        digitalWrite(PIN_DIR,HIGH);
+	endduring = speedUp(16);
+
+	Serial.print("endduring:");
+	Serial.println(endduring, DEC);
+
+      for(int i = 0; i < 1600; i++)
+      {
+            digitalWrite(PIN_PULS, LOW);
+            delayMicroseconds(endduring);
+            digitalWrite(PIN_PULS, HIGH);
+            delayMicroseconds(endduring);
+      }
+
+
+        while(1);
 
 //	dmotor(500, 500, 500);       //电机驱动
 
