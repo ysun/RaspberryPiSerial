@@ -9,12 +9,13 @@
 #define PIN_DIR 6
 #define PIN_ENABLE 8
 
-#define PIN_INTER_RIGHT 0  //Equal to pin 3; 0 means pin 2 on the board
-#define PIN_INTER_LEFT 1
+#define PIN_INTER_RIGHT 1  //Equal to pin 3; 0 means pin 2 on the board
+#define PIN_INTER_LEFT 0
 
 #define TRAN_RATION 75
 
 #define PULSE_RATE 400
+#define PULSE_DELAY 100
 
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
@@ -22,8 +23,10 @@
 int g_inputCount = 0;
 bool g_processFlag = false;
 
-boolean inter_right = false;
-boolean inter_left = false;
+bool g_afterSetup = false;
+
+bool inter_right = false;
+bool inter_left = false;
 
 //pointer of serial buffer
 int string_head = 0;
@@ -60,7 +63,9 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 
 	digitalWrite(PIN_DIR, direct_left_default);
 
-	for(i = 0; i < steps && (!inter_left && !inter_right); i++)
+	inter_left = inter_right = false; //just for interrupt!
+
+	for(i = 0; i < steps; i++)
 	{
 		if (inter_left || inter_right)
 			break;
@@ -70,8 +75,6 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
-
-	inter_left = inter_right = false;
 
 	return i;
 }
@@ -92,7 +95,7 @@ void motor_run(long distance)
 	//保存此过程所需脉冲数
 	//motor_time_end=millis();			    //开始记录时间
      
-	do_run(pulse_total, 200, dir_left_or_right(distance));
+	do_run(pulse_total, PULSE_DELAY, dir_left_or_right(distance));
      
 /*
       //将当前位置保存至EEPROM中
@@ -122,23 +125,27 @@ void stop_motor()
 }
 
 //function for interrupt
-void inter_left_callback()
+void linterrupt()
 {
+	if(!g_afterSetup) return;
 	
-	motor_run(100);
+//	motor_run(100);
 	stop_motor();
+
+	motor_run(5);
 
 	inter_left = true;
-	
 	return;
 }
-void inter_right_callback()
+void rinterrupt()
 {
+	if(!g_afterSetup) return;
 	
-	motor_run(-100);
+//	motor_run(-100);
 	stop_motor();
-
 	
+	motor_run(-5);
+
 	inter_right = true;
 
 	return;
@@ -147,10 +154,19 @@ void inter_right_callback()
 
 void setup() {
 	// put your setup code here, to run once:
+
 	//---===引脚模式设置===---// 
 	pinMode(PIN_PULS, OUTPUT);
 	pinMode(PIN_DIR, OUTPUT);
 	pinMode(PIN_ENABLE, OUTPUT);
+
+	pinMode(2, OUTPUT);
+	pinMode(3, OUTPUT);
+
+	delay(100);
+
+	digitalWrite(2,LOW);
+	digitalWrite(3,LOW);
 
 	//---===分配空间===---//
 	comdata = (unsigned char *) malloc(CMD_DATA_LEN * sizeof(char));
@@ -161,10 +177,13 @@ void setup() {
 	digitalWrite(PIN_ENABLE,LOW);
 
 	//中断开启
-	attachInterrupt(PIN_INTER_LEFT, inter_left_callback, RISING);
-	attachInterrupt(PIN_INTER_RIGHT, inter_right_callback, RISING);
+	attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
+	attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 
 	Serial.begin(9600);	      //打开串口
+
+	inter_left = inter_right = false;
+	g_afterSetup = true;
 }
 
 
@@ -324,9 +343,4 @@ void loop() {
 	processData();
 
 	delay(10);
-/*
-	motor_run(600);
-	delay(1000);
-	motor_run(-600);
-*/
 }
