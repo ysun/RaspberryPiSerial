@@ -15,7 +15,7 @@
 #define TRAN_RATION 75
 
 #define PULSE_RATE 400
-#define PULSE_DELAY 100
+#define PULSE_DELAY_DEFAULT 100
 
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
@@ -24,6 +24,8 @@ int g_inputCount = 0;
 bool g_processFlag = false;
 
 bool g_afterSetup = false;
+
+int g_pulseDelay = PULSE_DELAY_DEFAULT;
 
 bool inter_right = false;
 bool inter_left = false;
@@ -95,7 +97,7 @@ void motor_run(long distance)
 	//保存此过程所需脉冲数
 	//motor_time_end=millis();			    //开始记录时间
      
-	do_run(pulse_total, PULSE_DELAY, dir_left_or_right(distance));
+	do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
      
 /*
       //将当前位置保存至EEPROM中
@@ -288,6 +290,11 @@ void processMotor()
 			motor_run(distance);	//电机驱动
 
 			Serial.println("Finished B moving!!!");
+			break;
+		case 'V':
+			Serial.println("Here V!");
+			g_pulseDelay = para[0].d;
+			
 			break;
 	}
 }
