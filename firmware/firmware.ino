@@ -16,6 +16,8 @@
 
 #define PULSE_RATE 400
 #define PULSE_DELAY_DEFAULT 100
+#define PULSE_DELAY_MAX 200
+#define PULSE_DELAY_MIN 50
 
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
@@ -305,6 +307,19 @@ void processMotor()
 			Serial.println("Here V!");
 			g_pulseDelay = para[0].d;
 			
+			break;
+
+		case 'v':
+			g_pulseDelay += para[0].d;
+			if(g_pulseDelay > PULSE_DELAY_MAX) {
+				g_pulseDelay = PULSE_DELAY_MAX;
+			}
+			else if (g_pulseDelay < PULSE_DELAY_MIN)
+				g_pulseDelay = PULSE_DELAY_MIN;
+
+			Serial.print("Here v! g_pulseDelay:");
+			Serial.println(g_pulseDelay);
+
 			break;
 	}
 }
