@@ -234,11 +234,17 @@ void parseData(unsigned char *comdata)
 
 	if(found_head) {
 		memcpy(cmd.c, comdata + string_end, 4);
+
+		//empty buffer where are already read, before move on tail pointer!
+		memset(comdata + string_end, 0, 4);
 		string_end = (string_end + 4) % MAX_QUEUE;
 
 		for(int x=0;x<4;x++)
 		{
 			memcpy(para[x].c, comdata + string_end, sizeof(para[x].c));
+
+			//empty buffer where are already read, before move on tail pointer!
+			memset(comdata + string_end, 0, sizeof(para[x].c));
 			string_end = (string_end + sizeof(para[x].c) ) % MAX_QUEUE;
 		}
 
@@ -290,6 +296,10 @@ void processMotor()
 			motor_run(distance);	//电机驱动
 
 			Serial.println("Finished B moving!!!");
+			break;
+		case 'C':
+			Serial.println("Here C checking");
+
 			break;
 		case 'V':
 			Serial.println("Here V!");
