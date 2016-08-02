@@ -192,6 +192,22 @@ int open_port(char const *dev)
 
 	return fd;
 }
+void usage() {
+
+	printf("\n\r						\
+./control [<-m -x -y -z>] [-l <format>] [-t <format>]\n\r	\
+	-m: command: A,B,C,V,v,	\n\r				\
+	-x: oppsited x distance	\n\r				\
+	-y: oppsited y distance	\n\r				\
+	-z: oppsited z distance	\n\r				\
+				\n\r				\
+	-l <format>: long command\n\r				\
+		format: <command>,<x>,<y>,<z>	\n\r		\
+	-t <format>: long command with timeout	\n\r		\
+		format:<timeout>,<command>,<x>,<y>,<z>	\n\r	\
+			timeout in millisecond	\n\r		\
+		");
+}
 int main(int argc, char **argv)  
 {  
 	int ch;  
@@ -234,7 +250,8 @@ int main(int argc, char **argv)
 
 			case '?':
 			default:
-				printf("Here should print USAGE\n");  
+				usage();
+				exit(0);
 		}  
 		printf("opt [%c] with optopt: %s\n", ch, optarg);	
 	}
