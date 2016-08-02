@@ -72,20 +72,20 @@ def detectInputKey(fname):
             if key_code == 2:
                if key_value >= 0 and key_value < 1:
                    print "move left"
-                   os.system("./control -t 300,B,0,-%d,0" %g_distance);
+                   os.system("./control -t 400,B,0,-%d,0" %g_distance);
                elif key_value > 254 and key_value <= 255:
                    print "move right"
-                   os.system("./control -t 300,B,0,%d,0"%g_distance);
+                   os.system("./control -t 400,B,0,%d,0"%g_distance);
 
             if key_code == 304:
                if key_value >= 1:
                    print "speed up"
-                   os.system("./control -l v,-5");
+                   os.system("./control -l v,-10");
 
             if key_code == 305:
                if key_value >= 1:
                    print "speed down"
-                   os.system("./control -l v,5");
+                   os.system("./control -l v,10");
 
             if key_code == 307:
                if key_value >= 1:
