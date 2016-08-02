@@ -5,6 +5,7 @@
 #define CMD_SIZE	(5 * 4)
 #define CMD_DATA_LEN	CMD_SIZE * 40
 
+//add
 #define PIN_PULS 5
 #define PIN_DIR 6
 #define PIN_ENABLE 8
