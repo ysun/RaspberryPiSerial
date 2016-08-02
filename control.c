@@ -10,6 +10,8 @@
 #include <termios.h>
 #include <stdlib.h>
 
+#include <sys/time.h>
+
 #define SETBITSPEED(opt, s)		\
 do					\
 {					\
@@ -35,8 +37,12 @@ union CMD
 		char rev;
 	};
 } cmd;
+long int timeout = 0;
+unsigned char g_isidle = 0;
 
 char buff[20];
+char buff_child[1024];
+
 void do_run_cmd(int fd, char buff[20]){
 	write(fd, buff, 20);
 }
@@ -52,7 +58,7 @@ void fill_data_tail(union PARA *para){
 }
 
 void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
-	int i, j;
+	int j;
 	fill_cmd_head(cmd);
 
 	fill_data_tail(&para[3]);
@@ -67,39 +73,6 @@ void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
 	printf("\n");
 
 	do_run_cmd(fd, buff);
-}
-
-
-void testfunction(int fd){
-	union CMD cmd;
-	union PARA para[4];
-	int nread;
-	char buff[20];
-
-	int i, j;
-	memset(&cmd, 0, 4);
-	memset(&para, 0, 16);
-
-	cmd.flag[0] = 0xee;
-	cmd.flag[1] = 0xee;
-
-	cmd.cmd = 'B';
-	cmd.rev = 0;
-
-	for(i = 0; i < 3; i++)
-		para[i].d = 500;
-
-	para[3].d = CMD_SUFFIX;
-	
-	memcpy(buff, cmd.c, 4);
-	memcpy(buff+4, para, 16);
-
-	for(j = 0; j < 20; j++)
-		printf("%x,", buff[j]);
-
-	printf("\n");
-
-	write(fd, buff, 20);
 }
 
 int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
@@ -222,8 +195,7 @@ int open_port(char const *dev)
 int main(int argc, char **argv)  
 {  
 	int ch;  
-	char buff[1024] = {0};
-	int nread,i;
+	int i;
 	char *dev[]={"/dev/ttyUSB0"};
 	int fd; //For serial device
 
@@ -235,7 +207,7 @@ int main(int argc, char **argv)
 	// Command options
 	//
 	opterr = 0;  
-	while ((ch = getopt(argc, argv, "m:x:y:z:l:")) != -1)  
+	while ((ch = getopt(argc, argv, "m:x:y:z:l:t:")) != -1)  
 	{  
 		switch(ch)  
 		{  
@@ -255,13 +227,17 @@ int main(int argc, char **argv)
 				sscanf(optarg, "%c,%ld,%ld,%ld",
 						&cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
 				break;	
+			case 't':  
+				sscanf(optarg, "%ld,%c,%ld,%ld,%ld",
+						&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
+				break;	
+
 			case '?':
 			default:
 				printf("Here should print USAGE\n");  
 		}  
 		printf("opt [%c] with optopt: %s\n", ch, optarg);	
 	}
-	//////////////////////
 
 
 	//////////////////////////
@@ -281,9 +257,52 @@ int main(int argc, char **argv)
 		return -2;
 	}
 
+	if(timeout > 0) {
+		union CMD t_cmd;
+		union PARA t_para[4];
 
-	run_cmd(fd, &cmd, para);
-	//testfunction(fd);	
+		int count = 0;
+		int nread = 0;
+		char tmp_tv[100] = {0},tmp[100] = {0};
+		int i = 0;
+
+		memset(&t_cmd, 0, sizeof(union CMD));
+		memset(t_para, 0, 4 * sizeof(union PARA));
+		memset(buff_child, 0, 1024);
+
+		struct timeval tv;  
+		gettimeofday(&tv, 0);
+
+		sprintf(tmp_tv, "copy %lu:%lu",tv.tv_sec, tv.tv_usec);  	//for string searching!
+		printf("%s\n", tmp_tv);
+
+		t_cmd.cmd = 'C';
+		t_para[0].d = tv.tv_sec;
+		t_para[1].d = tv.tv_usec;
+
+		run_cmd(fd, &t_cmd, t_para);
+		fsync(fd);
+
+		for( i = 0; i < timeout; i++) {
+			usleep(1000);
+			nread = read(fd, tmp, 100);
+			if(nread) {
+				memcpy(buff_child + count, tmp, nread);
+				count += nread;
+			}
+		}
+		printf("child process:(%d) %s\n",count, buff_child);
+
+		if( strstr(buff_child, tmp_tv) != NULL) {
+			printf("g_isidle = 1\n");
+			g_isidle = 1;
+		}
+
+	} else
+		g_isidle = 1;
+
+	if (g_isidle)
+		run_cmd(fd, &cmd, para);
 
 	close(fd);
 

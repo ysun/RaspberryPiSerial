@@ -184,6 +184,7 @@ void setup() {
 	attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
 	attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 
+	//Have to put serial initial after interrupt initializaion.
 	Serial.begin(9600);	      //打开串口
 
 	inter_left = inter_right = false;
@@ -300,7 +301,10 @@ void processMotor()
 			Serial.println("Finished B moving!!!");
 			break;
 		case 'C':
-			Serial.println("Here C checking");
+			Serial.print("copy ");
+			Serial.print(para[0].d);
+			Serial.print(":");
+			Serial.print(para[1].d);
 
 			break;
 		case 'V':
