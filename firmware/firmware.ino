@@ -15,7 +15,13 @@
 #define TRAN_RATION 75
 
 #define PULSE_RATE 400
+
+#if AXIS != 1
+#define PULSE_DELAY_DEFAULT 400
+#else
 #define PULSE_DELAY_DEFAULT 100
+#endif
+
 #define PULSE_DELAY_MAX 200
 #define PULSE_DELAY_MIN 50
 
@@ -308,22 +314,25 @@ void processMotor()
 
 			break;
 		case 'V':
-			Serial.println("Here V!");
-			g_pulseDelay = para[0].d;
+			if (AXIS == 1) {
+				Serial.println("Here V!");
+				g_pulseDelay = para[0].d;
+			}
 			
 			break;
 
 		case 'v':
-			g_pulseDelay += para[0].d;
-			if(g_pulseDelay > PULSE_DELAY_MAX) {
-				g_pulseDelay = PULSE_DELAY_MAX;
+			if (AXIS == 1) {
+				g_pulseDelay += para[0].d;
+				if(g_pulseDelay > PULSE_DELAY_MAX) {
+					g_pulseDelay = PULSE_DELAY_MAX;
+				}
+				else if (g_pulseDelay < PULSE_DELAY_MIN)
+					g_pulseDelay = PULSE_DELAY_MIN;
+
+				Serial.print("Here v! g_pulseDelay:");
+				Serial.println(g_pulseDelay);
 			}
-			else if (g_pulseDelay < PULSE_DELAY_MIN)
-				g_pulseDelay = PULSE_DELAY_MIN;
-
-			Serial.print("Here v! g_pulseDelay:");
-			Serial.println(g_pulseDelay);
-
 			break;
 	}
 }
