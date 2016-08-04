@@ -22,6 +22,12 @@ do					\
 #define CMD_PREFIX	0xeeee
 #define CMD_SUFFIX	0xdddddddd
 
+char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
+
+#define COUNTOFARDUINO	sizeof(dev[0])
+//#define COUNTOFARDUINO 1	
+int g_fd[10] = {0};			//For serial device
+
 union PARA
 {
 	char c[4];
@@ -38,7 +44,7 @@ union CMD
 	};
 } cmd;
 long int timeout = 0;
-unsigned char g_isidle = 0;
+unsigned char g_isidle[10] = {0};
 
 char buff[20];
 char buff_child[1024];
@@ -67,6 +73,7 @@ void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
 	memcpy(buff, cmd->c, 4);
 	memcpy(buff+4, para, 16);
 
+	printf("run_cmd:\n");
 	for(j = 0; j < 20; j++)
 		printf("%x,", buff[j]);
 
@@ -161,7 +168,7 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 
 */
 
-	printf("set done!\n");
+	printf("set_opt: done!\n");
 	return 0;
 }
 int open_port(char const *dev)
@@ -176,7 +183,7 @@ int open_port(char const *dev)
 		return(-1);
 	}
 	else 
-		printf("open %s .....\n", dev);
+		printf("open %s\n", dev);
 
 	if(fcntl(fd, F_SETFL, 0) < 0)
 		printf("fcntl failed!\n");
@@ -194,30 +201,71 @@ int open_port(char const *dev)
 }
 void usage() {
 
-	printf("\n\r						\
-./control [<-m -x -y -z>] [-l <format>] [-t <format>]\n\r	\
-	-m: command: A,B,C,V,v,	\n\r				\
-	-x: oppsited x distance	\n\r				\
-	-y: oppsited y distance	\n\r				\
-	-z: oppsited z distance	\n\r				\
-				\n\r				\
-	-l <format>: long command\n\r				\
-		format: <command>,<x>,<y>,<z>	\n\r		\
-	-t <format>: long command with timeout	\n\r		\
-		format:<timeout>,<command>,<x>,<y>,<z>	\n\r	\
-			timeout in millisecond	\n\r		\
-		");
+	printf("\n\r\
+./control [<-m -x -y -z>] [-l <format>] [-t <format>]\n\r\
+  -m: command: A,B,C,V,v,	\n\r\
+  -x: oppsited x distance	\n\r\
+  -y: oppsited y distance	\n\r\
+  -z: oppsited z distance	\n\r\
+\n\r\
+  -l <format>: long command\n\r\
+        format: <command>,<x>,<y>,<z>	\n\r\
+  -t <format>: long command with timeout	\n\r\
+        format:<timeout>,<command>,<x>,<y>,<z>	\n\r\
+  		timeout in millisecond	\n\r\
+\n");
+}
+int isidle(int j) {
+	union CMD t_cmd;
+	union PARA t_para[4];
+
+	int count = 0;
+	int nread = 0;
+	char tmp_tv[100] = {0},tmp[100] = {0};
+	int i = 0;
+
+	memset(&t_cmd, 0, sizeof(union CMD));
+	memset(t_para, 0, 4 * sizeof(union PARA));
+	memset(buff_child, 0, 1024);
+
+	struct timeval tv;  
+	gettimeofday(&tv, 0);
+
+	sprintf(tmp_tv, "copy %lu:%lu",tv.tv_sec, tv.tv_usec);  	//for string searching!
+	printf("isidle: checking string: %s\n", tmp_tv);
+
+	t_cmd.cmd = 'C';
+	t_para[0].d = tv.tv_sec;
+	t_para[1].d = tv.tv_usec;
+
+	run_cmd(g_fd[j], &t_cmd, t_para);
+	fsync(g_fd[j]);
+	count = 0;
+
+	for( i = 0; i < timeout; i++) {
+		usleep(1000);
+		nread = read(g_fd[j], tmp, 100);
+		if(nread) {
+			memcpy(buff_child + count, tmp, nread);
+			count += nread;
+		}
+	}
+	printf("received from arduino(%d) %s\n",count, buff_child);
+
+	if( strstr(buff_child, tmp_tv) != NULL) {
+		printf("g_isidle[%d] = 1\n", j);
+		g_isidle[j] = 1;
+		return 1;
+	}
+	return 0;
 }
 int main(int argc, char **argv)  
 {  
 	int ch;  
-	int i;
-	char *dev[]={"/dev/ttyUSB0"};
-	int fd; //For serial device
+	int i, j;
 
 	memset(&cmd, 0, 4);
 	memset(para, 0, 16);
-
 
 	///////////////////////
 	// Command options
@@ -257,71 +305,41 @@ int main(int argc, char **argv)
 	}
 
 
-	//////////////////////////
-	// Open serial port
-	// By default open ttyUSB0
-	//
-	if((fd = open_port(dev[0])) < 0){
-		perror("open_port error");
-		return -1;
+	for(i = 0; i < COUNTOFARDUINO; i++) {
+		//////////////////////////
+		// Open serial port
+		// By default open ttyUSB0
+		//
+		if((g_fd[i] = open_port(dev[i])) < 0){
+			perror("open_port error");
+			return -1;
+		}
+
+		//////////////////////////
+		// Set serial port
+		//
+		if((set_opt(g_fd[i], 9600, 8, 'N', 1)) < 0){
+			perror("set_opt error");
+			return -2;
+		}
 	}
 
-	//////////////////////////
-	// Set serial port
-	//
-	if((i=set_opt(fd,9600,8,'N',1))<0){
-		perror("set_opt error");
-		return -2;
-	}
 
 	if(timeout > 0) {
-		union CMD t_cmd;
-		union PARA t_para[4];
-
-		int count = 0;
-		int nread = 0;
-		char tmp_tv[100] = {0},tmp[100] = {0};
-		int i = 0;
-
-		memset(&t_cmd, 0, sizeof(union CMD));
-		memset(t_para, 0, 4 * sizeof(union PARA));
-		memset(buff_child, 0, 1024);
-
-		struct timeval tv;  
-		gettimeofday(&tv, 0);
-
-		sprintf(tmp_tv, "copy %lu:%lu",tv.tv_sec, tv.tv_usec);  	//for string searching!
-		printf("%s\n", tmp_tv);
-
-		t_cmd.cmd = 'C';
-		t_para[0].d = tv.tv_sec;
-		t_para[1].d = tv.tv_usec;
-
-		run_cmd(fd, &t_cmd, t_para);
-		fsync(fd);
-
-		for( i = 0; i < timeout; i++) {
-			usleep(1000);
-			nread = read(fd, tmp, 100);
-			if(nread) {
-				memcpy(buff_child + count, tmp, nread);
-				count += nread;
-			}
-		}
-		printf("child process:(%d) %s\n",count, buff_child);
-
-		if( strstr(buff_child, tmp_tv) != NULL) {
-			printf("g_isidle = 1\n");
-			g_isidle = 1;
+		for(j = 0; j < COUNTOFARDUINO; j++) {
+			isidle(j);
 		}
 
 	} else
-		g_isidle = 1;
+		for (j = 0; j < COUNTOFARDUINO; j++)
+			g_isidle[j] = 1;
 
-	if (g_isidle)
-		run_cmd(fd, &cmd, para);
+	for(j = 0; j < COUNTOFARDUINO; j++) {
+		if (g_isidle[j])
+			run_cmd(g_fd[j], &cmd, para);
 
-	close(fd);
+		close(g_fd[j]);
+	}
 
 	return 0;
 }
