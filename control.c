@@ -24,7 +24,7 @@ do					\
 
 char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
 
-#define COUNTOFARDUINO	sizeof(dev[0])
+#define COUNTOFARDUINO	3 //sizeof(dev[0])
 //#define COUNTOFARDUINO 1	
 int g_fd[10] = {0};			//For serial device
 

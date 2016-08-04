@@ -1,5 +1,5 @@
 #include <EEPROM.h>			
-#define AXIS 1 //0:x, 1:y, 2:z
+#define AXIS 2 //0:x, 1:y, 2:z
 
 #define MAX_QUEUE	512
 #define CMD_SIZE	(5 * 4)
