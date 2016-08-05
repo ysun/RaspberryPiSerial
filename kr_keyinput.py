@@ -63,11 +63,29 @@ def detectInputKey(fname):
             key_value = event.value
 
             print "code:%s value:%s" % (event.code, event.value)
-            if key_code == 5:
-               if key_value >= 0 and key_value < 1:
+            if key_code == 16:  #move X
+               if key_value == -1:
+                   print "move left"
+                   os.system("./control -t 400,B,0,-%d,0" %g_distance);
+               elif key_value == 1:
+                   print "move right"
+                   os.system("./control -t 400,B,0,%d,0"%g_distance);
+
+            if key_code == 17:  #move Y
+               if key_value == -1:
+                   print "move forward"
+                   os.system("./control -t 400,B,-%d,0,0" %g_distance);
+               elif key_value == 1:
+                   print "move backward"
+                   os.system("./control -t 400,B,%d,0,0"%g_distance);
+
+            if key_code == 5:   #move Z
+               if key_value >= 1 and key_value <= 127:
                    print "move up"
-               elif key_value > 254 and key_value <= 255:
+                   os.system("./control -t 400,B,0,0,-%d" %g_distance);
+               elif key_value >= 129 and key_value <= 255:
                    print "move down"
+                   os.system("./control -t 400,B,0,0,%d" %g_distance);
 
             if key_code == 2:
                if key_value >= 0 and key_value < 1:
