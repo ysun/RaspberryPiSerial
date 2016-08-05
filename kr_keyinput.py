@@ -10,6 +10,8 @@ import time
 import subprocess
 
 import multiprocessing
+import time
+import serial
 
 key_code = 0
 key_value = 0
@@ -141,21 +143,29 @@ def detectInputKey(fname):
  #               print "move right"
  #
 if __name__ == '__main__':
+    ser = [0,0,0];
+    for i in range(0,3):
+        ser[i] = serial.Serial(
+                port="/dev/ttyUSB%d"%i,
+                baudrate = 115200,
+                parity=serial.PARITY_NONE,
+                stopbits=serial.STOPBITS_ONE,
+                bytesize=serial.EIGHTBITS,
+                timeout=1
+            )
+
 #    printPath('/dev/input')
 #  subprocess.Popen(['/bin/sh', '-c', 'cd /usr/lib/edison_config_tools/blockr/mjpg-streamer && ./start.sh'])
-  while 1:
-    for fname in fileList:
-        print fname
+    while 1:
+        for fname in fileList:
+            print fname
+    
+            p = multiprocessing.Process( target=detectInputKey, args=(fname, ))
+            p.start()
+            processList.append(p)
 
-        p = multiprocessing.Process( target=detectInputKey, args=(fname, ))
-        p.start()
-        processList.append(p)
-
-
-#    printPath('/dev/input')
-#    time.sleep(10000)
-
-    for p in processList:
-        p.join()
+    
+        for p in processList:
+            p.join()
 
 #    detectInputKey()
