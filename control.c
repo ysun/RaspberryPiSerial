@@ -27,6 +27,7 @@ char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
 #define COUNTOFARDUINO	3 //sizeof(dev[0])
 //#define COUNTOFARDUINO 1	
 int g_fd[10] = {0};			//For serial device
+unsigned char g_ifdebug = 0;
 
 union PARA
 {
@@ -73,11 +74,13 @@ void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
 	memcpy(buff, cmd->c, 4);
 	memcpy(buff+4, para, 16);
 
+if(g_ifdebug) {
 	printf("run_cmd:\n");
 	for(j = 0; j < 20; j++)
 		printf("%x,", buff[j]);
 
 	printf("\n");
+}
 
 	do_run_cmd(fd, buff);
 }
@@ -168,7 +171,7 @@ int set_opt(int fd,int nSpeed, int nBits, char nEvent, int nStop)
 
 */
 
-	printf("set_opt: done!\n");
+	if(g_ifdebug) printf("set_opt: done!\n");
 	return 0;
 }
 int open_port(char const *dev)
@@ -232,7 +235,9 @@ int isidle(int j) {
 	gettimeofday(&tv, 0);
 
 	sprintf(tmp_tv, "copy %lu:%lu",tv.tv_sec, tv.tv_usec);  	//for string searching!
-	printf("isidle: checking string: %s\n", tmp_tv);
+
+	if (g_ifdebug)
+		printf("isidle: checking string: %s\n", tmp_tv);
 
 	t_cmd.cmd = 'C';
 	t_para[0].d = tv.tv_sec;
@@ -250,10 +255,11 @@ int isidle(int j) {
 			count += nread;
 		}
 	}
-	printf("received from arduino(%d) %s\n",count, buff_child);
+	if (g_ifdebug)
+		printf("received from arduino(%d) %s\n",count, buff_child);
 
 	if( strstr(buff_child, tmp_tv) != NULL) {
-		printf("g_isidle[%d] = 1\n", j);
+		if(g_ifdebug) printf("g_isidle[%d] = 1\n", j);
 		g_isidle[j] = 1;
 		return 1;
 	}
@@ -271,7 +277,7 @@ int main(int argc, char **argv)
 	// Command options
 	//
 	opterr = 0;  
-	while ((ch = getopt(argc, argv, "m:x:y:z:l:t:")) != -1)  
+	while ((ch = getopt(argc, argv, "dm:x:y:z:l:t:")) != -1)  
 	{  
 		switch(ch)  
 		{  
@@ -296,6 +302,9 @@ int main(int argc, char **argv)
 						&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
 				break;	
 
+			case 'd':
+				g_ifdebug = 1;
+				break;
 			case '?':
 			default:
 				usage();
