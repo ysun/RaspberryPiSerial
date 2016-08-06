@@ -74,13 +74,13 @@ void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
 	memcpy(buff, cmd->c, 4);
 	memcpy(buff+4, para, 16);
 
-if(g_ifdebug) {
-	printf("run_cmd:\n");
-	for(j = 0; j < 20; j++)
-		printf("%x,", buff[j]);
-
-	printf("\n");
-}
+	if(g_ifdebug) {
+		printf("run_cmd:\n");
+		for(j = 0; j < 20; j++)
+			printf("%x,", buff[j]);
+	
+		printf("\n");
+	}
 
 	do_run_cmd(fd, buff);
 }
@@ -186,19 +186,19 @@ int open_port(char const *dev)
 		return(-1);
 	}
 	else 
-		printf("open %s\n", dev);
+		if(g_ifdebug) printf("open %s\n", dev);
 
 	if(fcntl(fd, F_SETFL, 0) < 0)
 		printf("fcntl failed!\n");
 	else
-		printf("fcntl=%d\n", fcntl(fd, F_SETFL,0));
+		if(g_ifdebug) printf("fcntl=%d\n", fcntl(fd, F_SETFL,0));
 
 	if(isatty(STDIN_FILENO)==0)
 		printf("standard input is not a terminal device\n");
 	else
-		printf("isatty success!\n");
+		if(g_ifdebug) printf("isatty success!\n");
 
-	printf("fd-open=%d\n",fd);
+	if(g_ifdebug) printf("fd-open=%d\n",fd);
 
 	return fd;
 }
@@ -247,21 +247,22 @@ int isidle(int j) {
 	fsync(g_fd[j]);
 	count = 0;
 
-	for( i = 0; i < timeout; i++) {
-		usleep(1000);
+	for( i = 0; i < timeout * 100; i++) {  //unit of timeout is millisecond
+		usleep(10);
 		nread = read(g_fd[j], tmp, 100);
 		if(nread) {
 			memcpy(buff_child + count, tmp, nread);
 			count += nread;
 		}
-	}
-	if (g_ifdebug)
-		printf("received from arduino(%d) %s\n",count, buff_child);
 
-	if( strstr(buff_child, tmp_tv) != NULL) {
-		if(g_ifdebug) printf("g_isidle[%d] = 1\n", j);
-		g_isidle[j] = 1;
-		return 1;
+		if (g_ifdebug)
+			printf("received from arduino(%d) %s\n",count, buff_child);
+	
+		if( strstr(buff_child, tmp_tv) != NULL) {
+			if(g_ifdebug) printf("g_isidle[%d] = 1\n", j);
+			g_isidle[j] = 1;
+			return 1;
+		}
 	}
 	return 0;
 }
