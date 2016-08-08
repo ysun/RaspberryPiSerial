@@ -13,6 +13,8 @@ import multiprocessing
 import time
 import serial
 
+import os
+
 key_code = 0
 key_value = 0
 
@@ -144,9 +146,15 @@ def detectInputKey(fname):
  #
 if __name__ == '__main__':
     ser = [0,0,0];
-    for i in range(0,3):
+    i = 0;
+
+    filelist_usb = os.popen("ls /dev/ttyUSB*").readlines()
+
+    for file_usb in filelist_usb:
+        print "Opening Serial: %s"%file_usb.strip('\n')
+
         ser[i] = serial.Serial(
-                port="/dev/ttyUSB%d"%i,
+                port=file_usb.strip('\n'),
                 baudrate = 115200,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
@@ -154,6 +162,9 @@ if __name__ == '__main__':
                 timeout=1
             )
 
+#    while 1:
+#        pass
+#
 #    printPath('/dev/input')
 #  subprocess.Popen(['/bin/sh', '-c', 'cd /usr/lib/edison_config_tools/blockr/mjpg-streamer && ./start.sh'])
     while 1:
