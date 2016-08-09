@@ -12,13 +12,17 @@
 #define PIN_INTER_RIGHT 1  //Equal to pin 3; 0 means pin 2 on the board
 #define PIN_INTER_LEFT 0
 
-#define TRAN_RATION 75
 
 #define PULSE_RATE 400
 
+#define BACKSPACE_STEPS 1200
+#define ANTI_SHAKE_STEPS 10
+
 #if AXIS != 1
+#define TRAN_RATION 95
 #define PULSE_DELAY_DEFAULT 400
 #else
+#define TRAN_RATION 75
 #define PULSE_DELAY_DEFAULT 100
 #endif
 
@@ -27,6 +31,8 @@
 
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
+void linterrupt();
+void rinterrupt();
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -85,6 +91,39 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
+	if (inter_left || inter_right) {
+		unsigned int j = 0;
+		delay(500);
+
+		digitalWrite(PIN_DIR, !direct_left_default);
+		inter_left = inter_right = false; //just for interrupt!
+
+		detachInterrupt(PIN_INTER_LEFT);
+		detachInterrupt(PIN_INTER_RIGHT);
+
+		attachInterrupt(PIN_INTER_LEFT, linterrupt, FALLING);
+		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, FALLING);
+
+		int interdelay = 0;
+		for(i = 0; i < BACKSPACE_STEPS; i++) {
+			if (inter_left || inter_right)
+				break;
+			for(j = 0; j < ANTI_SHAKE_STEPS; j++) {
+				digitalWrite(PIN_PULS, LOW);
+				delayMicroseconds(during_micro_second);
+				digitalWrite(PIN_PULS, HIGH);
+				delayMicroseconds(during_micro_second);
+			}
+
+		}
+
+		detachInterrupt(PIN_INTER_LEFT);
+		detachInterrupt(PIN_INTER_RIGHT);
+
+		attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
+		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
+	}
+
 
 	return i;
 }
@@ -139,10 +178,7 @@ void linterrupt()
 {
 	if(!g_afterSetup) return;
 	
-//	motor_run(100);
 	stop_motor();
-
-	motor_run(5);
 
 	inter_left = true;
 	return;
@@ -151,13 +187,9 @@ void rinterrupt()
 {
 	if(!g_afterSetup) return;
 	
-//	motor_run(-100);
 	stop_motor();
-	
-	motor_run(-5);
 
 	inter_right = true;
-
 	return;
 }
 
