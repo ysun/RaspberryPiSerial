@@ -12,6 +12,8 @@
 
 #include <sys/time.h>
 
+#include <dirent.h>
+
 #define SETBITSPEED(opt, s)		\
 do					\
 {					\
@@ -22,12 +24,14 @@ do					\
 #define CMD_PREFIX	0xeeee
 #define CMD_SUFFIX	0xdddddddd
 
-char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
+//char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
+char file_dev[10][128];
 
 #define COUNTOFARDUINO	3 //sizeof(dev[0])
 //#define COUNTOFARDUINO 1	
 int g_fd[10] = {0};			//For serial device
 unsigned char g_ifdebug = 0;
+int g_countTTYUSB = 0;
 
 union PARA
 {
@@ -266,6 +270,25 @@ int isidle(int j) {
 	}
 	return 0;
 }
+void listDir(char *path)
+{
+	DIR *pDir;
+	struct dirent *ent;
+	char childpath[512];
+
+	pDir = opendir(path);
+	memset(childpath, 0, sizeof(childpath));
+
+	while((ent = readdir(pDir)) != NULL) //read pDir
+	{
+		//if type is NOT DT_DIR which is a file, print name directly
+		//this is also the exit of recursive
+		if (strstr(ent->d_name, "ttyUSB") != NULL) {
+			sprintf( file_dev[g_countTTYUSB], "%s/%s", path, ent->d_name);
+			g_countTTYUSB++;
+		}
+	}
+}
 int main(int argc, char **argv)  
 {  
 	int ch;  
@@ -273,6 +296,7 @@ int main(int argc, char **argv)
 
 	memset(&cmd, 0, 4);
 	memset(para, 0, 16);
+	memset(file_dev, 0, 128 * 10);
 
 	///////////////////////
 	// Command options
@@ -314,13 +338,14 @@ int main(int argc, char **argv)
 		printf("opt [%c] with optopt: %s\n", ch, optarg);	
 	}
 
+	listDir("/dev");
 
-	for(i = 0; i < COUNTOFARDUINO; i++) {
+	for(i = 0; i < g_countTTYUSB; i++) {
 		//////////////////////////
 		// Open serial port
 		// By default open ttyUSB0
 		//
-		if((g_fd[i] = open_port(dev[i])) < 0){
+		if((g_fd[i] = open_port(file_dev[i])) < 0){
 			perror("open_port error");
 			return -1;
 		}
@@ -353,3 +378,4 @@ int main(int argc, char **argv)
 
 	return 0;
 }
+
