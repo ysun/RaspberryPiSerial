@@ -148,7 +148,7 @@ if __name__ == '__main__':
     ser = [0,0,0];
     i = 0;
 
-    filelist_usb = os.popen("ls /dev/ttyUSB*").readlines()
+    filelist_usb = os.popen("ls /dev/Arduino*").readlines()
 
     for file_usb in filelist_usb:
         print "Opening Serial: %s"%file_usb.strip('\n')
@@ -161,9 +161,10 @@ if __name__ == '__main__':
                 bytesize=serial.EIGHTBITS,
                 timeout=1
             )
+        i = i + 1
 
-#    while 1:
-#        pass
+    while 1:
+        pass
 #
 #    printPath('/dev/input')
 #  subprocess.Popen(['/bin/sh', '-c', 'cd /usr/lib/edison_config_tools/blockr/mjpg-streamer && ./start.sh'])
