@@ -1,0 +1,2 @@
+# ACTION=="add", SUBSYSTEM=="tty", PROGRAM=/home/work/control/getDevName.sh, SYMLINK=%c
+KERNEL=="ttyUSB*", ACTION=="add", SUBSYSTEM=="tty", PROGRAM="/home/work/control/getDevName.sh", SYMLINK="%c"
