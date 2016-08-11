@@ -58,6 +58,7 @@ long g_position = 0;
 
 bool inter_right = false;
 bool inter_left = false;
+bool g_reachend = false;
 
 //pointer of serial buffer
 int string_head = 0;
@@ -90,7 +91,7 @@ union CMD
 } cmd;
 unsigned long do_run(unsigned long steps, unsigned long during_micro_second, bool direct_left_default)
 {
-	unsigned long i = 0;
+	unsigned long i = 0, j = 0, k = 0;
 
 	digitalWrite(PIN_DIR, direct_left_default);
 
@@ -107,7 +108,6 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		delayMicroseconds(during_micro_second);
 	}
 	if (inter_left || inter_right) {
-		unsigned int j = 0;
 		delay(500);
 
 		digitalWrite(PIN_DIR, !direct_left_default);
@@ -119,7 +119,7 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		attachInterrupt(PIN_INTER_LEFT, linterrupt, FALLING);
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, FALLING);
 
-		for(i = 0; i < BACKSPACE_STEPS; i++) {
+		for(k = 0; k < BACKSPACE_STEPS; k++) {
 			if (inter_left || inter_right)
 				break;
 			for(j = 0; j < ANTI_SHAKE_STEPS; j++) {
@@ -127,6 +127,8 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 				delayMicroseconds(during_micro_second);
 				digitalWrite(PIN_PULS, HIGH);
 				delayMicroseconds(during_micro_second);
+
+				i++;
 			}
 
 		}
@@ -162,18 +164,30 @@ void printCurPos() {
 void motor_run(long distance)
 {
 	unsigned long pulse_total = int(abs(distance) * (PULSE_RATE / (TRAN_RATION * 1.0)));
+	unsigned long pulse_actual = 0;
+	
+	long distance_actual = 0;
+
+
 	//Enable motor, LOW means enabling.
 	digitalWrite(PIN_ENABLE,LOW);
 
 	g_needUpdatePos = true; //by defalut need update position after moving expect for interrupt triggered!
+	g_reachend = false;
      
 	//保存此过程所需脉冲数
 	//motor_time_end=millis();			    //开始记录时间
      
-	do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
+	pulse_actual = do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
+
+	if(distance != 0 && g_reachend)
+		distance_actual = (distance / abs(distance)) * round (((pulse_actual * 1.0) / (PULSE_RATE * 1.0)) * TRAN_RATION) ;
+	else
+		distance_actual = distance;
+		
 
 	if(g_needUpdatePos) {
-		updatePos( getCurPos() + distance);
+		updatePos( getCurPos() + distance_actual);
 	}
 
 	printCurPos();
@@ -225,10 +239,11 @@ void rinterrupt()
 	
 	stop_motor();
 
-	g_position = 0xFFFFFFFF;
-	EEPROM.write(REG_POS_LOW, 0xFF);
-	EEPROM.write(REG_POS_HIGH, 0xFF);
-	g_needUpdatePos = false;
+//	g_position = 0xFFFFFFFF;
+//	EEPROM.write(REG_POS_LOW, 0xFF);
+//	EEPROM.write(REG_POS_HIGH, 0xFF);
+//	g_needUpdatePos = false;
+	g_reachend = true;
 
 	inter_right = true;
 	return;
