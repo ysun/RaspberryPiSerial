@@ -38,7 +38,7 @@
 #define REG_POS_HIGH 1
 
 #define GET_POS_LOW(pos)	pos & MASK_POS_LOW
-#define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) > 8
+#define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) >> 8
 
 
 void linterrupt();
@@ -151,9 +151,9 @@ void printCurPos() {
 	Serial.print("cur pos:");
 	Serial.print(g_position);
 	Serial.print(" (");
-	Serial.print(EEPROM.read(REG_POS_LOW));
-	Serial.print(" : ");
 	Serial.print(EEPROM.read(REG_POS_HIGH));
+	Serial.print(" : ");
+	Serial.print(EEPROM.read(REG_POS_LOW));
 	Serial.print(" =");
 	Serial.print(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256);
 	Serial.println(" )");
@@ -243,7 +243,7 @@ long getCurPos() {
 	return g_position;
 }
 long getCurPosReg() {
-	return EEPROM.read(REG_POS_LOW) + EEPROM.read(REG_POS_HIGH) * 256;
+	return EEPROM.read(REG_POS_LOW) + (EEPROM.read(REG_POS_HIGH) << 8);
 }
 void reset() {
 	motor_run(-1100);
@@ -353,9 +353,6 @@ int speedUp(int countStep){   //chaning speed every 100 steps!
       float tdelay = 350;
       for(i = 0; i < countStep; i++)
       {
-	    Serial.print("tdelay:");
-	    Serial.println(tdelay);
-
 	    for(int j = 0; j < 100; j++){
 		    digitalWrite(PIN_PULS, LOW);
 		    delayMicroseconds(int(tdelay));
@@ -374,7 +371,7 @@ void processMotor()
 	switch(cmd.data.mode)
 	{
 		case 'A':			//move:输入的x,y,z是绝对坐标
-			Serial.println("Here A !!!!!");
+			Serial.print("Here A ! para.d:");
 
 			distance = para[AXIS].d - getCurPosReg();
 			motor_run(distance);	//电机驱动
