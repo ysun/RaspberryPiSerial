@@ -31,8 +31,20 @@
 
 #define ADDRESS_LOW 2
 #define ADDRESS_HIGH 1
+
+#define MASK_POS_LOW 0xFF
+#define MASK_POS_HIGH 0xFF00
+#define REG_POS_LOW 0
+#define REG_POS_HIGH 1
+
+#define GET_POS_LOW(pos)	pos & MASK_POS_LOW
+#define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) > 8
+
+
 void linterrupt();
 void rinterrupt();
+void updatePos(long pos);
+long getCurPos();
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -40,6 +52,9 @@ bool g_processFlag = false;
 bool g_afterSetup = false;
 
 int g_pulseDelay = PULSE_DELAY_DEFAULT;
+bool g_needUpdatePos = true;
+
+long g_position = 0;
 
 bool inter_right = false;
 bool inter_left = false;
@@ -104,7 +119,6 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		attachInterrupt(PIN_INTER_LEFT, linterrupt, FALLING);
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, FALLING);
 
-		int interdelay = 0;
 		for(i = 0; i < BACKSPACE_STEPS; i++) {
 			if (inter_left || inter_right)
 				break;
@@ -124,7 +138,6 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 	}
 
-
 	return i;
 }
 
@@ -134,18 +147,36 @@ bool dir_left_or_right(long obj_distance) {
 	else
 		return true; // left
 }
+void printCurPos() {
+	Serial.print("cur pos:");
+	Serial.print(g_position);
+	Serial.print(" (");
+	Serial.print(EEPROM.read(REG_POS_LOW));
+	Serial.print(" : ");
+	Serial.print(EEPROM.read(REG_POS_HIGH));
+	Serial.print(" =");
+	Serial.print(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256);
+	Serial.println(" )");
+}
 
 void motor_run(long distance)
 {
 	unsigned long pulse_total = int(abs(distance) * (PULSE_RATE / (TRAN_RATION * 1.0)));
 	//Enable motor, LOW means enabling.
 	digitalWrite(PIN_ENABLE,LOW);
+
+	g_needUpdatePos = true; //by defalut need update position after moving expect for interrupt triggered!
      
 	//保存此过程所需脉冲数
 	//motor_time_end=millis();			    //开始记录时间
      
 	do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
-     
+
+	if(g_needUpdatePos) {
+		updatePos( getCurPos() + distance);
+	}
+
+	printCurPos();
 /*
       //将当前位置保存至EEPROM中
       value_time_0 = motor_time%256;
@@ -180,6 +211,11 @@ void linterrupt()
 	
 	stop_motor();
 
+	g_position = 0;
+	EEPROM.write(REG_POS_LOW, 0);
+	EEPROM.write(REG_POS_HIGH, 0);
+	g_needUpdatePos = false;
+
 	inter_left = true;
 	return;
 }
@@ -189,10 +225,23 @@ void rinterrupt()
 	
 	stop_motor();
 
+	g_position = 0xFFFFFFFF;
+	EEPROM.write(REG_POS_LOW, 0xFF);
+	EEPROM.write(REG_POS_HIGH, 0xFF);
+	g_needUpdatePos = false;
+
 	inter_right = true;
 	return;
 }
+void updatePos(long pos) {
+	g_position = pos;
 
+	EEPROM.write(REG_POS_LOW, GET_POS_LOW(pos));
+	EEPROM.write(REG_POS_HIGH, GET_POS_HIGH(pos));
+}
+long getCurPos() {
+	return g_position;
+}
 void reset() {
 	motor_run(-1100);
 }
@@ -231,7 +280,6 @@ void setup() {
 	inter_left = inter_right = false;
 	g_afterSetup = true;
 }
-
 
 void printData(unsigned char *comdata)
 {
@@ -324,14 +372,11 @@ void processMotor()
 	{
 		case 'A':			//move:输入的x,y,z是绝对坐标
 			Serial.println("Here A !!!!!");
-			distance = para[AXIS].d;
-/*
-			distance_y=objpos_x-curpos_x;		     //所需运行位移
-			distance_y=objpos_y-curpos_y;		     //所需运行位移
-			distance_z=objpos_z-curpos_z;		    //所需运行位移
-*/
+
+			distance = para[AXIS].d - getCurPos();
 			motor_run(distance);	//电机驱动
 
+			Serial.println("Finished A moving!!!");
 			break;
 		case 'B':		      //move:输入的x,y,z是相对坐标
 			Serial.println("Here B moving!!!");
