@@ -26,7 +26,7 @@
 #define PULSE_DELAY_DEFAULT 100
 #endif
 
-#define PULSE_DELAY_MAX 200
+#define PULSE_DELAY_MAX 500
 #define PULSE_DELAY_MIN 50
 
 #define ADDRESS_LOW 2
@@ -371,7 +371,7 @@ void processMotor()
 			break;
 
 		case 'R':
-			g_pulseDelay = 400;
+			g_pulseDelay = PULSE_DELAY_MAX;
 			reset();
 
 			break;
