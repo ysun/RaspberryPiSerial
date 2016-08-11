@@ -14,6 +14,20 @@
 
 #include <dirent.h>
 
+//add include to dp server
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <stdarg.h>
+#include <stdbool.h>
+
+#define SERVER_PORT 5000
+#define BUFFER_SIZE 256
+#define FILE_NAME_MAX_SIZE 64
+///////
+
 #define SETBITSPEED(opt, s)		\
 do					\
 {					\
@@ -32,6 +46,10 @@ char file_dev[10][128];
 int g_fd[10] = {0};			//For serial device
 unsigned char g_ifdebug = 0;
 int g_countTTYUSB = 0;
+
+///upd data
+struct sockaddr_in g_server_addr;
+int g_server_socket_fd;
 
 union PARA
 {
@@ -289,10 +307,71 @@ void listDir(char *path)
 		}
 	}
 }
+void udpInit()
+{
+	//<1>create the connector of socke
+	bzero(&g_server_addr,sizeof(g_server_addr));
+	g_server_addr.sin_family = AF_INET;
+	g_server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	g_server_addr.sin_port = htons(SERVER_PORT);
+
+	//<2>create socket
+	g_server_socket_fd = socket(AF_INET,SOCK_DGRAM, 0);
+	if(g_server_socket_fd == -1)
+	{
+		perror("Create Socket Failed:");
+		exit(1);
+	}
+
+	//<3>bind upd connector
+	if(-1 == (bind(g_server_socket_fd, (struct sockaddr*)&g_server_addr, sizeof(g_server_addr))))
+	{
+		perror("Server Bind Failed:");
+		exit(1);
+	}
+}
+
+void udpserver()
+{
+	int n;			//receiver data length
+	//<1>data transmit
+	//[1]degfine a address to get the address of client
+	struct sockaddr_in client_addr;
+	socklen_t client_addr_length = sizeof(client_addr);
+	//[2]receive data
+	char buffer[BUFFER_SIZE];
+	bzero(buffer,BUFFER_SIZE);
+
+
+	n = recvfrom(g_server_socket_fd, buffer, BUFFER_SIZE, 0,
+			(struct sockaddr*)&client_addr, &client_addr_length);
+	if(n > 0)
+	{
+		buffer[n] = 0;
+		sscanf(buffer, "%ld,%c,%ld,%ld,%ld",
+				&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
+		printf("opt with optopt: %ld,%c,%ld,%ld,%ld\n",
+				timeout, cmd.cmd, para[0].d, para[1].d, para[2].d);
+
+		n = sendto(g_server_socket_fd, buffer, n, 0,
+				(struct sockaddr*)&client_addr, sizeof(client_addr));
+
+		if(n >= 0)
+			sendto(g_server_socket_fd, "Receive succeed, Please input new instruct...",
+					n, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+	}
+	else
+		sendto(g_server_socket_fd, "Receive failed, Please input new instruct...",
+				n, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+
+	return;
+}
+
 int main(int argc, char **argv)  
 {  
 	int ch;  
 	int i, j;
+	bool udp_enter = false;
 
 	memset(&cmd, 0, 4);
 	memset(para, 0, 16);
@@ -302,7 +381,7 @@ int main(int argc, char **argv)
 	// Command options
 	//
 	opterr = 0;  
-	while ((ch = getopt(argc, argv, "dm:x:y:z:l:t:")) != -1)  
+	while ((ch = getopt(argc, argv, "dum:x:y:z:l:t:")) != -1)
 	{  
 		switch(ch)  
 		{  
@@ -317,7 +396,7 @@ int main(int argc, char **argv)
 				break;	
 			case 'z':  
 				para[2].d = atoi(optarg);
-				break;	
+				break;
 			case 'l':  
 				sscanf(optarg, "%c,%ld,%ld,%ld",
 						&cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
@@ -326,7 +405,10 @@ int main(int argc, char **argv)
 				sscanf(optarg, "%ld,%c,%ld,%ld,%ld",
 						&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
 				break;	
-
+			case 'u':
+				udpInit();
+				udp_enter = true;
+				break;
 			case 'd':
 				g_ifdebug = 1;
 				break;
@@ -369,12 +451,17 @@ int main(int argc, char **argv)
 		for (j = 0; j < COUNTOFARDUINO; j++)
 			g_isidle[j] = 1;
 
-	for(j = 0; j < COUNTOFARDUINO; j++) {
-		if (g_isidle[j])
-			run_cmd(g_fd[j], &cmd, para);
+	do {
+		if (udp_enter) udpserver();
 
+		for(j = 0; j < COUNTOFARDUINO; j++) {
+			if (g_isidle[j])
+				run_cmd(g_fd[j], &cmd, para);
+		}
+	} while(udp_enter);
+
+	for(j = 0; j < COUNTOFARDUINO; j++)
 		close(g_fd[j]);
-	}
 
 	return 0;
 }
