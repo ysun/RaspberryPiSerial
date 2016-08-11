@@ -242,6 +242,9 @@ void updatePos(long pos) {
 long getCurPos() {
 	return g_position;
 }
+long getCurPosReg() {
+	return EEPROM.read(REG_POS_LOW) + EEPROM.read(REG_POS_HIGH) * 256;
+}
 void reset() {
 	motor_run(-1100);
 }
@@ -373,7 +376,7 @@ void processMotor()
 		case 'A':			//move:输入的x,y,z是绝对坐标
 			Serial.println("Here A !!!!!");
 
-			distance = para[AXIS].d - getCurPos();
+			distance = para[AXIS].d - getCurPosReg();
 			motor_run(distance);	//电机驱动
 
 			Serial.println("Finished A moving!!!");
