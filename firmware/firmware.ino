@@ -1,5 +1,5 @@
 #include <EEPROM.h>			
-#define AXIS 2 //0:x, 1:y, 2:z
+#define AXIS 2
 
 #define MAX_QUEUE	512
 #define CMD_SIZE	(5 * 4)
@@ -193,6 +193,9 @@ void rinterrupt()
 	return;
 }
 
+void reset() {
+	motor_run(-1100);
+}
 
 void setup() {
 	// put your setup code here, to run once:
@@ -366,6 +369,13 @@ void processMotor()
 				Serial.println(g_pulseDelay);
 			}
 			break;
+
+		case 'R':
+			g_pulseDelay = 400;
+			reset();
+
+			break;
+
 	}
 }
 
