@@ -19,11 +19,11 @@
 #define ANTI_SHAKE_STEPS 10
 
 #if AXIS != 1
-#define TRAN_RATION 95
-#define PULSE_DELAY_DEFAULT 400
+	#define TRAN_RATION 95
+	#define PULSE_DELAY_DEFAULT 400
 #else
-#define TRAN_RATION 75
-#define PULSE_DELAY_DEFAULT 100
+	#define TRAN_RATION 75
+	#define PULSE_DELAY_DEFAULT 100
 #endif
 
 #define PULSE_DELAY_MAX 500
@@ -36,6 +36,9 @@
 #define MASK_POS_HIGH 0xFF00
 #define REG_POS_LOW 0
 #define REG_POS_HIGH 1
+
+#define REG_LEN_LOW 2
+#define REG_LEN_HIGH 3
 
 #define GET_POS_LOW(pos)	pos & MASK_POS_LOW
 #define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) >> 8
@@ -128,7 +131,7 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 				digitalWrite(PIN_PULS, HIGH);
 				delayMicroseconds(during_micro_second);
 
-				i++;
+				i--;
 			}
 
 		}
@@ -184,7 +187,6 @@ void motor_run(long distance)
 		distance_actual = (distance / abs(distance)) * round (((pulse_actual * 1.0) / (PULSE_RATE * 1.0)) * TRAN_RATION) ;
 	else
 		distance_actual = distance;
-		
 
 	if(g_needUpdatePos) {
 		updatePos( getCurPos() + distance_actual);
@@ -261,7 +263,7 @@ long getCurPosReg() {
 	return EEPROM.read(REG_POS_LOW) + (EEPROM.read(REG_POS_HIGH) << 8);
 }
 void reset() {
-	motor_run(-1100);
+	motor_run(-1500);
 }
 
 void setup() {
