@@ -92,6 +92,13 @@ union CMD
 		unsigned char getzero;
 	}data;	
 } cmd;
+
+long getCurPos() {
+	return g_position;
+}
+long getCurPosReg() {
+	return EEPROM.read(REG_POS_LOW) + (EEPROM.read(REG_POS_HIGH) << 8);
+}
 unsigned long do_run(unsigned long steps, unsigned long during_micro_second, bool direct_left_default)
 {
 	unsigned long i = 0, j = 0, k = 0;
@@ -143,7 +150,7 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 	}
 
-	return i;
+	return (direct_left_default ? -i : i);
 }
 
 bool dir_left_or_right(long obj_distance) {
@@ -152,6 +159,14 @@ bool dir_left_or_right(long obj_distance) {
 	else
 		return true; // left
 }
+long m_to_pulse(long distance) {
+	return long(round(distance * (PULSE_RATE / (TRAN_RATION * 1.0))));
+}
+
+long pulse_to_m(long pulse) {
+	return long(round(((pulse * 1.0) / (PULSE_RATE * 1.0)) * TRAN_RATION));
+}
+
 void printCurPos() {
 	Serial.print("cur pos:");
 	Serial.print(g_position);
@@ -159,9 +174,8 @@ void printCurPos() {
 	Serial.print(EEPROM.read(REG_POS_HIGH));
 	Serial.print(" : ");
 	Serial.print(EEPROM.read(REG_POS_LOW));
-	Serial.print(" =");
-	Serial.print(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256);
-	Serial.println(" )");
+	Serial.print(" ) =");
+	Serial.println(pulse_to_m(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256));
 }
 
 void motor_run(long distance)
@@ -183,13 +197,8 @@ void motor_run(long distance)
      
 	pulse_actual = do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
 
-	if(distance != 0 && g_reachend)
-		distance_actual = (distance / abs(distance)) * round (((pulse_actual * 1.0) / (PULSE_RATE * 1.0)) * TRAN_RATION) ;
-	else
-		distance_actual = distance;
-
 	if(g_needUpdatePos) {
-		updatePos( getCurPos() + distance_actual);
+		updatePos( getCurPosReg() + pulse_actual);
 	}
 
 	printCurPos();
@@ -241,10 +250,6 @@ void rinterrupt()
 	
 	stop_motor();
 
-//	g_position = 0xFFFFFFFF;
-//	EEPROM.write(REG_POS_LOW, 0xFF);
-//	EEPROM.write(REG_POS_HIGH, 0xFF);
-//	g_needUpdatePos = false;
 	g_reachend = true;
 
 	inter_right = true;
@@ -256,12 +261,7 @@ void updatePos(long pos) {
 	EEPROM.write(REG_POS_LOW, GET_POS_LOW(pos));
 	EEPROM.write(REG_POS_HIGH, GET_POS_HIGH(pos));
 }
-long getCurPos() {
-	return g_position;
-}
-long getCurPosReg() {
-	return EEPROM.read(REG_POS_LOW) + (EEPROM.read(REG_POS_HIGH) << 8);
-}
+
 void reset() {
 	motor_run(-1500);
 }
@@ -388,9 +388,11 @@ void processMotor()
 	switch(cmd.data.mode)
 	{
 		case 'A':			//move:输入的x,y,z是绝对坐标
-			Serial.print("Here A ! para.d:");
+			Serial.print("Here A ! para.d: pulse:");
 
-			distance = para[AXIS].d - getCurPosReg();
+			distance = para[AXIS].d - pulse_to_m(getCurPosReg());
+			Serial.print(distance);
+
 			motor_run(distance);	//电机驱动
 
 			Serial.println("Finished A moving!!!");
