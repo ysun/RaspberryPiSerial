@@ -41,7 +41,7 @@ do					\
 //char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
 char file_dev[10][128];
 
-#define COUNTOFARDUINO	3 //sizeof(dev[0])
+#define COUNTOFARDUINO	4 //sizeof(dev[0])
 //#define COUNTOFARDUINO 1	
 int g_fd[10] = {0};			//For serial device
 unsigned char g_ifdebug = 0;
@@ -55,7 +55,7 @@ union PARA
 {
 	char c[4];
 	long int d;
-} para[4];
+} para[5];
 union CMD
 {
 	char c[4];
@@ -69,11 +69,11 @@ union CMD
 long int timeout = 0;
 unsigned char g_isidle[10] = {0};
 
-char buff[20];
+char buff[24];
 char buff_child[1024];
 
-void do_run_cmd(int fd, char buff[20]){
-	write(fd, buff, 20);
+void do_run_cmd(int fd, char buff[24]){
+	write(fd, buff, 24);
 }
 
 void fill_cmd_head(union CMD *cmd){
@@ -86,19 +86,19 @@ void fill_data_tail(union PARA *para){
 	para->d = CMD_SUFFIX;
 }
 
-void run_cmd(int fd, union CMD *cmd, union PARA para[4]){
+void run_cmd(int fd, union CMD *cmd, union PARA para[5]){
 	int j;
 	fill_cmd_head(cmd);
 
-	fill_data_tail(&para[3]);
+	fill_data_tail(&para[4]);
 
 
 	memcpy(buff, cmd->c, 4);
-	memcpy(buff+4, para, 16);
+	memcpy(buff+4, para, 20);
 
 	if(g_ifdebug) {
 		printf("run_cmd:\n");
-		for(j = 0; j < 20; j++)
+		for(j = 0; j < 24; j++)
 			printf("%x,", buff[j]);
 	
 		printf("\n");
@@ -242,7 +242,7 @@ void usage() {
 }
 int isidle(int j) {
 	union CMD t_cmd;
-	union PARA t_para[4];
+	union PARA t_para[5];
 
 	int count = 0;
 	int nread = 0;
@@ -250,7 +250,7 @@ int isidle(int j) {
 	int i = 0;
 
 	memset(&t_cmd, 0, sizeof(union CMD));
-	memset(t_para, 0, 4 * sizeof(union PARA));
+	memset(t_para, 0, 5 * sizeof(union PARA));
 	memset(buff_child, 0, 1024);
 
 	struct timeval tv;  
@@ -348,21 +348,21 @@ void udpserver()
 	if(n > 0)
 	{
 		buffer[n] = 0;
-		sscanf(buffer, "%ld,%c,%ld,%ld,%ld",
-				&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
-		printf("opt with optopt: %ld,%c,%ld,%ld,%ld\n",
-				timeout, cmd.cmd, para[0].d, para[1].d, para[2].d);
+		sscanf(buffer, "%ld,%c,%ld,%ld,%ld,%ld",
+				&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d, &para[3].d);
+		printf("opt with optopt: %ld,%c,%ld,%ld,%ld,%ld\n",
+				timeout, cmd.cmd, para[0].d, para[1].d, para[2].d, para[3].d);
 
 		n = sendto(g_server_socket_fd, buffer, n, 0,
 				(struct sockaddr*)&client_addr, sizeof(client_addr));
 
 		if(n >= 0)
-			sendto(g_server_socket_fd, "Receive succeed, Please input new instruct...",
-					n, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+			sendto(g_server_socket_fd, "S:",
+					2, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 	}
 	else
-		sendto(g_server_socket_fd, "Receive failed, Please input new instruct...",
-				n, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+		sendto(g_server_socket_fd, "F:",
+				2, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
 	return;
 }
@@ -374,14 +374,14 @@ int main(int argc, char **argv)
 	bool udp_enter = false;
 
 	memset(&cmd, 0, 4);
-	memset(para, 0, 16);
+	memset(para, 0, 20);
 	memset(file_dev, 0, 128 * 10);
 
 	///////////////////////
 	// Command options
 	//
 	opterr = 0;  
-	while ((ch = getopt(argc, argv, "dum:x:y:z:l:t:")) != -1)
+	while ((ch = getopt(argc, argv, "dum:x:y:z:c:l:t:")) != -1)
 	{  
 		switch(ch)  
 		{  
@@ -397,13 +397,16 @@ int main(int argc, char **argv)
 			case 'z':  
 				para[2].d = atoi(optarg);
 				break;
+			case 'c':
+				para[3].d = atoi(optarg);
+				break;
 			case 'l':  
-				sscanf(optarg, "%c,%ld,%ld,%ld",
-						&cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
+				sscanf(optarg, "%c,%ld,%ld,%ld,%ld",
+						&cmd.cmd, &para[0].d, &para[1].d, &para[2].d, &para[3].d);
 				break;	
 			case 't':  
-				sscanf(optarg, "%ld,%c,%ld,%ld,%ld",
-						&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d);
+				sscanf(optarg, "%ld,%c,%ld,%ld,%ld,%ld",
+						&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d, &para[3].d);
 				break;	
 			case 'u':
 				udpInit();
