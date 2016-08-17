@@ -1,8 +1,8 @@
 #include <EEPROM.h>			
-#define AXIS 2
+#define AXIS 3		//0:x, 1:y, 2:z, 3:cloud
 
 #define MAX_QUEUE	512
-#define CMD_SIZE	(5 * 4)
+#define CMD_SIZE	(6 * 4)
 #define CMD_DATA_LEN	CMD_SIZE * 40
 
 #define PIN_PULS 5
@@ -18,7 +18,10 @@
 #define BACKSPACE_STEPS 1200
 #define ANTI_SHAKE_STEPS 10
 
-#if AXIS != 1
+#if AXIS == 3
+	#define TRAN_RATION 0.5
+	#define PULSE_DELAY_DEFAULT 400
+#elif AXIS != 1
 	#define TRAN_RATION 95
 	#define PULSE_DELAY_DEFAULT 400
 #else
@@ -43,11 +46,11 @@
 #define GET_POS_LOW(pos)	pos & MASK_POS_LOW
 #define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) >> 8
 
-
 void linterrupt();
 void rinterrupt();
 void updatePos(long pos);
 long getCurPos();
+
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -79,7 +82,7 @@ union PARA
 	unsigned char c[4];  
 	long int d;
 };
-union PARA para[4];
+union PARA para[5];
 
 union CMD
 {
@@ -335,7 +338,11 @@ void parseData(unsigned char *comdata)
 	//while( (string_head + 1) % MAX_QUEUE != string_end )
 	while( string_head != string_end )
 	{
-		if(comdata[string_end] == 0xee && comdata[string_end + 1] == 0xee){
+		if(comdata[string_end] == 0xee && comdata[(string_end + 1) % MAX_QUEUE] == 0xee
+				&& comdata[(string_end + 20) % MAX_QUEUE] == 0xdd
+				&& comdata[(string_end + 21) % MAX_QUEUE] == 0xdd
+				&& comdata[(string_end + 22) % MAX_QUEUE] == 0xdd
+				&& comdata[(string_end + 23) % MAX_QUEUE] == 0xdd){
 			found_head = true; 
 			break;
 		} else {
@@ -345,19 +352,21 @@ void parseData(unsigned char *comdata)
 	}
 
 	if(found_head) {
-		memcpy(cmd.c, comdata + string_end, 4);
+		int x = 0;
+		for(x = 0; x < 4; x++){
+			cmd.c[x] = comdata[string_end];
+			comdata[string_end] = 0;
+			string_end = (string_end + 1) % MAX_QUEUE;
+		}
 
-		//empty buffer where are already read, before move on tail pointer!
-		memset(comdata + string_end, 0, 4);
-		string_end = (string_end + 4) % MAX_QUEUE;
-
-		for(int x=0;x<4;x++)
+		for(x = 0; x < 4; x++)
 		{
-			memcpy(para[x].c, comdata + string_end, sizeof(para[x].c));
-
-			//empty buffer where are already read, before move on tail pointer!
-			memset(comdata + string_end, 0, sizeof(para[x].c));
-			string_end = (string_end + sizeof(para[x].c) ) % MAX_QUEUE;
+			int y = 0;
+			for(y = 0; y < 4; y++){
+				para[x].c[y] = comdata[string_end];
+				comdata[string_end] = 0;
+				string_end = (string_end + 1) % MAX_QUEUE;
+			}
 		}
 
 		found_head = false;
@@ -446,7 +455,7 @@ void processMotor()
 //get COM data
 void GetCOM_Data()
 {
-	//获取串口字符赋给comdata字符串，并获得结束位置 
+	//receive Serial port data
 	while (Serial.available() > 0)	
 	{
 		printGlobalCount( ++g_inputCount );
