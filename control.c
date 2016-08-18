@@ -46,7 +46,7 @@ unsigned char g_ifdebug = 0;
 int g_countTTYUSB = 0;
 
 ///upd data
-struct sockaddr_in g_server_addr;
+struct sockaddr_in g_server_addr, client_addr;
 int g_server_socket_fd;
 
 union PARA
@@ -251,7 +251,7 @@ int isidle(int j) {
 	memset(t_para, 0, 5 * sizeof(union PARA));
 	memset(buff_child, 0, 1024);
 
-	struct timeval tv;  
+	struct timeval tv;
 	gettimeofday(&tv, 0);
 
 	sprintf(tmp_tv, "copy %lu:%lu",tv.tv_sec, tv.tv_usec);  	//for string searching!
@@ -333,8 +333,6 @@ void udpserver()
 {
 	int n;			//receiver data length
 	//<1>data transmit
-	//[1]degfine a address to get the address of client
-	struct sockaddr_in client_addr;
 	socklen_t client_addr_length = sizeof(client_addr);
 	//[2]receive data
 	char buffer[BUFFER_SIZE];
@@ -434,12 +432,10 @@ int main(int argc, char **argv)
 		}
 	}
 
-
 	if(timeout > 0) {
 		for(j = 0; j < g_countTTYUSB; j++) {
 			isidle(j);
 		}
-
 	} else
 		for (j = 0; j < g_countTTYUSB; j++)
 			g_isidle[j] = 1;
@@ -454,6 +450,28 @@ int main(int argc, char **argv)
 		for(j = 0; j < g_countTTYUSB; j++) {
 			if (g_isidle[j])
 				run_cmd(g_fd[j], &cmd, para);
+		}
+		if (udp_enter) { //this if for info after moving!
+			struct timeval tv;
+			int sum = 0;
+			char tmp_tv[100] = {0};
+
+			gettimeofday(&tv, 0);
+
+			for(j = 0; j < g_countTTYUSB; j++) {
+				isidle(j);
+				sum += g_isidle[j];
+			}
+
+			if (sum == g_countTTYUSB) {
+				sprintf(tmp_tv, "Y: (%lu:%lu) ",tv.tv_sec, tv.tv_usec);  	//for string searching!
+				sendto(g_server_socket_fd, tmp_tv, 100, 0,
+						(struct sockaddr*)&client_addr, sizeof(client_addr));
+			} else {
+				sprintf(tmp_tv, "N: (%lu:%lu) ",tv.tv_sec, tv.tv_usec);  	//for string searching!
+				sendto(g_server_socket_fd, tmp_tv, 100, 0,
+						(struct sockaddr*)&client_addr, sizeof(client_addr));
+			}
 		}
 	} while(udp_enter);
 
