@@ -19,14 +19,14 @@
 #define ANTI_SHAKE_STEPS 10
 
 #if AXIS == 3
-	#define TRAN_RATION 0.5
+	#define TRAN_RATION 2
 	#define PULSE_DELAY_DEFAULT 400
-#elif AXIS != 1
-	#define TRAN_RATION 95
-	#define PULSE_DELAY_DEFAULT 400
-#else
+#elif AXIS == 1
 	#define TRAN_RATION 75
 	#define PULSE_DELAY_DEFAULT 100
+#else
+	#define TRAN_RATION 95
+	#define PULSE_DELAY_DEFAULT 400
 #endif
 
 #define PULSE_DELAY_MAX 500
@@ -183,7 +183,8 @@ void printCurPos() {
 
 void motor_run(long distance)
 {
-	unsigned long pulse_total = int(abs(distance) * (PULSE_RATE / (TRAN_RATION * 1.0)));
+	unsigned long pulse_total = long(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0)));
+
 	unsigned long pulse_actual = 0;
 	
 	long distance_actual = 0;
@@ -359,7 +360,7 @@ void parseData(unsigned char *comdata)
 			string_end = (string_end + 1) % MAX_QUEUE;
 		}
 
-		for(x = 0; x < 4; x++)
+		for(x = 0; x < 5; x++)
 		{
 			int y = 0;
 			for(y = 0; y < 4; y++){

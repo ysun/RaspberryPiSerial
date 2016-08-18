@@ -25,7 +25,6 @@
 
 #define SERVER_PORT 5000
 #define BUFFER_SIZE 256
-#define FILE_NAME_MAX_SIZE 64
 ///////
 
 #define SETBITSPEED(opt, s)		\
@@ -41,8 +40,7 @@ do					\
 //char *dev[]={"/dev/ttyUSB0", "/dev/ttyUSB1", "/dev/ttyUSB2"};
 char file_dev[10][128];
 
-#define COUNTOFARDUINO	4 //sizeof(dev[0])
-//#define COUNTOFARDUINO 1	
+//#define g_countTTYUSB	4 //sizeof(dev[0])
 int g_fd[10] = {0};			//For serial device
 unsigned char g_ifdebug = 0;
 int g_countTTYUSB = 0;
@@ -349,20 +347,12 @@ void udpserver()
 	{
 		buffer[n] = 0;
 		sscanf(buffer, "%ld,%c,%ld,%ld,%ld,%ld",
-				&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d, &para[3].d);
+			&timeout, &cmd.cmd, &para[0].d, &para[1].d, &para[2].d, &para[3].d);
 		printf("opt with optopt: %ld,%c,%ld,%ld,%ld,%ld\n",
-				timeout, cmd.cmd, para[0].d, para[1].d, para[2].d, para[3].d);
-
-		n = sendto(g_server_socket_fd, buffer, n, 0,
-				(struct sockaddr*)&client_addr, sizeof(client_addr));
-
-		if(n >= 0)
-			sendto(g_server_socket_fd, "S:",
-					2, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+			timeout, cmd.cmd, para[0].d, para[1].d, para[2].d, para[3].d);
+		sendto(g_server_socket_fd, "Success", 7, 0,
+			(struct sockaddr*)&client_addr, sizeof(client_addr));
 	}
-	else
-		sendto(g_server_socket_fd, "F:",
-				2, 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
 	return;
 }
@@ -446,24 +436,28 @@ int main(int argc, char **argv)
 
 
 	if(timeout > 0) {
-		for(j = 0; j < COUNTOFARDUINO; j++) {
+		for(j = 0; j < g_countTTYUSB; j++) {
 			isidle(j);
 		}
 
 	} else
-		for (j = 0; j < COUNTOFARDUINO; j++)
+		for (j = 0; j < g_countTTYUSB; j++)
 			g_isidle[j] = 1;
-
 	do {
-		if (udp_enter) udpserver();
-
-		for(j = 0; j < COUNTOFARDUINO; j++) {
+		if (udp_enter)
+		{
+			memset(&cmd, 0, 4);
+			memset(para, 0, 20);
+			memset(file_dev, 0, 128 * 10);
+			udpserver();
+		}
+		for(j = 0; j < g_countTTYUSB; j++) {
 			if (g_isidle[j])
 				run_cmd(g_fd[j], &cmd, para);
 		}
 	} while(udp_enter);
 
-	for(j = 0; j < COUNTOFARDUINO; j++)
+	for(j = 0; j < g_countTTYUSB; j++)
 		close(g_fd[j]);
 
 	return 0;
