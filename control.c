@@ -301,7 +301,7 @@ void listDir(char *path)
 	{
 		//if type is NOT DT_DIR which is a file, print name directly
 		//this is also the exit of recursive
-		if (strstr(ent->d_name, "ttyUSB") != NULL) {
+		if (strstr(ent->d_name, "Arduino") != NULL) {
 			sprintf( file_dev[g_countTTYUSB], "%s/%s", path, ent->d_name);
 			g_countTTYUSB++;
 		}
