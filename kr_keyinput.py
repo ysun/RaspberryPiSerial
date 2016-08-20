@@ -145,7 +145,7 @@ def detectInputKey(fname):
  #               print "move right"
  #
 if __name__ == '__main__':
-    ser = [0,0,0];
+    ser = [0,0,0,0,0,0];
     i = 0;
 
     filelist_usb = os.popen("ls /dev/Arduino*").readlines()
@@ -155,7 +155,7 @@ if __name__ == '__main__':
 
         ser[i] = serial.Serial(
                 port=file_usb.strip('\n'),
-                baudrate = 115200,
+                baudrate = 9600,
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
                 bytesize=serial.EIGHTBITS,
