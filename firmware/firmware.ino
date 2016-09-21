@@ -1,5 +1,6 @@
 #include <EEPROM.h>			
-#define AXIS 3		//0:x, 1:y, 2:z, 3:cloud
+//0:x axis, 1:y axis, 2:z axis, 3:w cloud platform
+#define AXIS 3
 
 #define MAX_QUEUE	512
 #define CMD_SIZE	(6 * 4)
@@ -18,9 +19,9 @@
 #define BACKSPACE_STEPS 1200
 #define ANTI_SHAKE_STEPS 10
 
-#if AXIS == 3
-	#define TRAN_RATION 2
-	#define PULSE_DELAY_DEFAULT 400
+#if AXIS == 3		//For clond-platform
+	#define TRAN_RATION 72			//360/(2000/400)
+	#define PULSE_DELAY_DEFAULT 250		//steps is 2000/r
 #elif AXIS == 1
 	#define TRAN_RATION 75
 	#define PULSE_DELAY_DEFAULT 100
