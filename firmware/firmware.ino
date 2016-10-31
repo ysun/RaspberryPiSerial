@@ -8,7 +8,7 @@
 
 #define PIN_PULS 5
 #define PIN_DIR 6
-#define PIN_ENABLE 8
+#define PIN_ENABLE 7
 
 #define PIN_INTER_RIGHT 1  //Equal to pin 3; 0 means pin 2 on the board
 #define PIN_INTER_LEFT 0
@@ -20,11 +20,11 @@
 #define ANTI_SHAKE_STEPS 10
 
 #if AXIS == 3		//For clond-platform
-	#define TRAN_RATION 72			//360/(2000/400)
-	#define PULSE_DELAY_DEFAULT 250		//steps is 2000/r
+	#define TRAN_RATION 45			//360/(2000/400)
+	#define PULSE_DELAY_DEFAULT 1500		//steps is 2000/r
 #elif AXIS == 1
 	#define TRAN_RATION 75
-	#define PULSE_DELAY_DEFAULT 100
+	#define PULSE_DELAY_DEFAULT 500
 #else
 	#define TRAN_RATION 95
 	#define PULSE_DELAY_DEFAULT 400
@@ -52,7 +52,6 @@ void rinterrupt();
 void updatePos(long pos);
 long getCurPos();
 
-
 int g_inputCount = 0;
 bool g_processFlag = false;
 
@@ -77,6 +76,7 @@ unsigned char * comdata;
 unsigned long motor_time;
 unsigned long motor_time_head;
 unsigned long motor_time_end;
+void stop_motor();
 
 union PARA
 {
@@ -121,6 +121,7 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
+
 	if (inter_left || inter_right) {
 		delay(500);
 
@@ -141,19 +142,15 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 				delayMicroseconds(during_micro_second);
 				digitalWrite(PIN_PULS, HIGH);
 				delayMicroseconds(during_micro_second);
-
 				i--;
 			}
-
 		}
-
 		detachInterrupt(PIN_INTER_LEFT);
 		detachInterrupt(PIN_INTER_RIGHT);
 
 		attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 	}
-
 	return (direct_left_default ? -i : i);
 }
 
@@ -184,6 +181,12 @@ void printCurPos() {
 
 void motor_run(long distance)
 {
+	if(AXIS == 3) {
+		if(distance >= 180)
+			distance =180;
+		if(distance <= -180)
+			distance = -180;
+	}
 	unsigned long pulse_total = long(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0)));
 
 	unsigned long pulse_actual = 0;
@@ -207,31 +210,12 @@ void motor_run(long distance)
 	}
 
 	printCurPos();
-/*
-      //将当前位置保存至EEPROM中
-      value_time_0 = motor_time%256;
-      value_time_1 = (motor_time/256)%256;
-      value_time_2 = (motor_time/256/256)%256;
-      value_time_3 = (motor_time/256/256/256)%256;
-      EEPROM.write(address_time_0, value_time_0);
-      EEPROM.write(address_time_1, value_time_1);
-      EEPROM.write(address_time_2, value_time_2);
-      EEPROM.write(address_time_3, value_time_3);
-
-     //将当前位置保存至EEPROM中
-     value_high = curpos_coor/256;
-     value_low	= curpos_coor%256;
-
-     EEPROM.write(ADDRESS_HIGH, value_high);
-     EEPROM.write(ADDRESS_LOW, value_low);
-*/
 }
 
 
 void stop_motor()
 {
-    digitalWrite(PIN_PULS,LOW);
-    digitalWrite(PIN_ENABLE,HIGH);
+	digitalWrite(PIN_PULS,LOW);
 }
 
 //function for interrupt
@@ -239,8 +223,6 @@ void linterrupt()
 {
 	if(!g_afterSetup) return;
 	
-	stop_motor();
-
 	g_position = 0;
 	EEPROM.write(REG_POS_LOW, 0);
 	EEPROM.write(REG_POS_HIGH, 0);
@@ -253,8 +235,6 @@ void rinterrupt()
 {
 	if(!g_afterSetup) return;
 	
-	stop_motor();
-
 	g_reachend = true;
 
 	inter_right = true;
@@ -268,7 +248,12 @@ void updatePos(long pos) {
 }
 
 void reset() {
-	motor_run(-1500);
+	if(AXIS == 2) {
+		motor_run(-50);
+		delay(100);
+	}
+	if(AXIS != 3)
+		motor_run(-1900);
 }
 
 void setup() {
@@ -281,7 +266,6 @@ void setup() {
 
 	pinMode(2, OUTPUT);
 	pinMode(3, OUTPUT);
-
 	delay(100);
 
 	digitalWrite(2,LOW);
@@ -395,7 +379,6 @@ int speedUp(int countStep){   //chaning speed every 100 steps!
 void processMotor()
 {
 	long distance = 0;
-
 	switch(cmd.data.mode)
 	{
 		case 'A':			//move:输入的x,y,z是绝对坐标
@@ -444,7 +427,6 @@ void processMotor()
 				Serial.println(g_pulseDelay);
 			}
 			break;
-
 		case 'R':
 			g_pulseDelay = PULSE_DELAY_MAX;
 			reset();
@@ -474,9 +456,9 @@ void GetCOM_Data()
 		printChar( comdata[string_head] );
 
 		if(comdata[string_head] == 0xdd &&
-			comdata[string_head-1] == 0xdd &&
-			comdata[string_head-2] == 0xdd &&
-			comdata[string_head-3] == 0xdd )
+			comdata[(string_head-1 + MAX_QUEUE) % MAX_QUEUE] == 0xdd &&
+			comdata[(string_head-2 + MAX_QUEUE) % MAX_QUEUE] == 0xdd &&
+			comdata[(string_head-3 + MAX_QUEUE) % MAX_QUEUE] == 0xdd )
 
 			g_processFlag = true;
 
@@ -496,13 +478,9 @@ void processData()
 	}
 
 	g_processFlag = false;
-
 }
 void loop() {
-
-	// put your main code here, to run repeatedly:
 	GetCOM_Data();
 	processData();
-
 	delay(10);
 }
