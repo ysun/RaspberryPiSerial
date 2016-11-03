@@ -51,6 +51,7 @@ void linterrupt();
 void rinterrupt();
 void updatePos(long pos);
 long getCurPos();
+void motor_run(long distance);
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -70,6 +71,7 @@ bool g_reachend = false;
 int string_head = 0;
 int string_end = 0;
 
+long g_targetPos = 0;
 unsigned char * comdata;
 
 //run duration of last running
@@ -176,6 +178,12 @@ void printCurPos() {
 	Serial.print(" : ");
 	Serial.print(EEPROM.read(REG_POS_LOW));
 	Serial.print(" ) =");
+	Serial.print(g_targetPos);
+	Serial.print(" ) =");
+	long positionCur = pulse_to_m(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256);
+	long distance = g_targetPos - positionCur;
+	if(distance != 0)
+		motor_run(distance);
 	Serial.println(pulse_to_m(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256));
 }
 
@@ -191,17 +199,11 @@ void motor_run(long distance)
 
 	unsigned long pulse_actual = 0;
 	
-	long distance_actual = 0;
-
-
 	//Enable motor, LOW means enabling.
 	digitalWrite(PIN_ENABLE,LOW);
 
 	g_needUpdatePos = true; //by defalut need update position after moving expect for interrupt triggered!
 	g_reachend = false;
-     
-	//保存此过程所需脉冲数
-	//motor_time_end=millis();			    //开始记录时间
      
 	pulse_actual = do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
 
@@ -384,6 +386,8 @@ void processMotor()
 		case 'A':			//move:输入的x,y,z是绝对坐标
 			Serial.print("Here A ! para.d: pulse:");
 
+			g_targetPos = para[AXIS].d;
+
 			distance = para[AXIS].d - pulse_to_m(getCurPosReg());
 			Serial.print(distance);
 
@@ -393,6 +397,8 @@ void processMotor()
 			break;
 		case 'B':		      //move:输入的x,y,z是相对坐标
 			Serial.println("Here B moving!!!");
+
+			g_targetPos = para[AXIS].d + pulse_to_m(getCurPosReg());
 
 			distance = para[AXIS].d;
 			motor_run(distance);	//电机驱动
@@ -428,6 +434,7 @@ void processMotor()
 			}
 			break;
 		case 'R':
+			g_targetPos = 0;
 			g_pulseDelay = PULSE_DELAY_MAX;
 			reset();
 
