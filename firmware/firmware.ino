@@ -52,6 +52,7 @@ void rinterrupt();
 void updatePos(long pos);
 long getCurPos();
 void motor_run(long distance);
+void printLog(const char str[]);
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -66,6 +67,9 @@ long g_position = 0;
 bool inter_right = false;
 bool inter_left = false;
 bool g_reachend = false;
+
+bool g_inInterruptLeft = false;
+bool g_inInterruptRight = false;
 
 //pointer of serial buffer
 int string_head = 0;
@@ -105,11 +109,11 @@ long getCurPos() {
 long getCurPosReg() {
 	return EEPROM.read(REG_POS_LOW) + (EEPROM.read(REG_POS_HIGH) << 8);
 }
-unsigned long do_run(unsigned long steps, unsigned long during_micro_second, bool direct_left_default)
+unsigned long do_run(unsigned long steps, unsigned long during_micro_second, bool direct_right_default)
 {
 	unsigned long i = 0, j = 0, k = 0;
 
-	digitalWrite(PIN_DIR, direct_left_default);
+	digitalWrite(PIN_DIR, !direct_right_default);
 
 	inter_left = inter_right = false; //just for interrupt!
 
@@ -123,7 +127,7 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
-
+#if 0
 	if (inter_left || inter_right) {
 		delay(500);
 
@@ -153,14 +157,30 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
 		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
 	}
-	return (direct_left_default ? -i : i);
+#endif
+	return (direct_right_default ? i : -i);
+}
+
+unsigned long do_run_interrupt(unsigned long steps, unsigned long during_micro_second, bool direct_right_default)
+{
+	unsigned long i = 0;
+
+	digitalWrite(PIN_DIR, !direct_right_default);
+
+	for(i = 0; i < steps; i++)
+	{
+		digitalWrite(PIN_PULS, LOW);
+		delayMicroseconds(during_micro_second*10);
+		digitalWrite(PIN_PULS, HIGH);
+		delayMicroseconds(during_micro_second*10);
+	}
 }
 
 bool dir_left_or_right(long obj_distance) {
 	if(obj_distance > 0) // right
-		return false;
+		return true;
 	else
-		return true; // left
+		return false; // left
 }
 long m_to_pulse(long distance) {
 	return long(round(distance * (PULSE_RATE / (TRAN_RATION * 1.0))));
@@ -180,11 +200,6 @@ void printCurPos() {
 	Serial.print(" ) =");
 	Serial.print(g_targetPos);
 	Serial.print(" ) =");
-	long positionCur = pulse_to_m(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256);
-	long distance = g_targetPos - positionCur;
-	if(distance != 0)
-		motor_run(distance);
-	Serial.println(pulse_to_m(EEPROM.read(REG_POS_LOW)+EEPROM.read(REG_POS_HIGH)*256));
 }
 
 void motor_run(long distance)
@@ -212,9 +227,26 @@ void motor_run(long distance)
 	}
 
 	printCurPos();
+
+	if(pulse_actual = 0 && !(inter_left || inter_right)) {
+		printLog("Motro moving check ERROR, run again!");
+		motor_run(distance);
+	}
 }
 
+void motor_run_interrupt(long distance)
+{
+	unsigned long pulse_total = long(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0)));
 
+	unsigned long pulse_actual = 0;
+
+	//Enable motor, LOW means enabling.
+	digitalWrite(PIN_ENABLE,LOW);
+
+	pulse_actual = do_run_interrupt(pulse_total, g_pulseDelay, dir_left_or_right(distance));
+
+	updatePos( getCurPosReg() + pulse_actual);
+}
 void stop_motor()
 {
 	digitalWrite(PIN_PULS,LOW);
@@ -223,7 +255,10 @@ void stop_motor()
 //function for interrupt
 void linterrupt()
 {
-	if(!g_afterSetup) return;
+	noInterrupts();
+	if(!g_afterSetup || g_inInterruptLeft) return;
+
+	g_inInterruptLeft = true;
 	
 	g_position = 0;
 	EEPROM.write(REG_POS_LOW, 0);
@@ -231,16 +266,27 @@ void linterrupt()
 	g_needUpdatePos = false;
 
 	inter_left = true;
-	return;
+
+	motor_run_interrupt(5);
+
+	g_inInterruptLeft = false;
+	interrupts();
 }
 void rinterrupt()
 {
-	if(!g_afterSetup) return;
-	
+	noInterrupts();
+	if(!g_afterSetup || g_inInterruptRight) return;
+
+	g_inInterruptRight = true;
+
 	g_reachend = true;
 
 	inter_right = true;
-	return;
+
+	motor_run_interrupt(-5);
+
+	g_inInterruptRight = false;
+	interrupts();
 }
 void updatePos(long pos) {
 	g_position = pos;
@@ -268,10 +314,8 @@ void setup() {
 
 	pinMode(2, OUTPUT);
 	pinMode(3, OUTPUT);
-	delay(100);
-
-	digitalWrite(2,LOW);
-	digitalWrite(3,LOW);
+	digitalWrite(2,HIGH);
+	digitalWrite(3,HIGH);
 
 	//---===分配空间===---//
 	comdata = (unsigned char *) malloc(CMD_DATA_LEN * sizeof(char));
@@ -282,8 +326,8 @@ void setup() {
 	digitalWrite(PIN_ENABLE,LOW);
 
 	//中断开启
-	attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
-	attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
+	attachInterrupt(PIN_INTER_LEFT, linterrupt, LOW);
+	attachInterrupt(PIN_INTER_RIGHT, rinterrupt, LOW);
 
 	//Have to put serial initial after interrupt initializaion.
 	Serial.begin(9600);	      //打开串口
@@ -291,7 +335,12 @@ void setup() {
 	inter_left = inter_right = false;
 	g_afterSetup = true;
 }
-
+void printLog(const char str[])
+{
+	int i = 0;
+	Serial.print("\r\n[LOG]");
+	Serial.println(str);
+}
 void printData(unsigned char *comdata)
 {
 	int i = 0;
