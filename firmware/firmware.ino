@@ -127,37 +127,6 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
-#if 0
-	if (inter_left || inter_right) {
-		delay(500);
-
-		digitalWrite(PIN_DIR, !direct_left_default);
-		inter_left = inter_right = false; //just for interrupt!
-
-		detachInterrupt(PIN_INTER_LEFT);
-		detachInterrupt(PIN_INTER_RIGHT);
-
-		attachInterrupt(PIN_INTER_LEFT, linterrupt, FALLING);
-		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, FALLING);
-
-		for(k = 0; k < BACKSPACE_STEPS; k++) {
-			if (inter_left || inter_right)
-				break;
-			for(j = 0; j < ANTI_SHAKE_STEPS; j++) {
-				digitalWrite(PIN_PULS, LOW);
-				delayMicroseconds(during_micro_second);
-				digitalWrite(PIN_PULS, HIGH);
-				delayMicroseconds(during_micro_second);
-				i--;
-			}
-		}
-		detachInterrupt(PIN_INTER_LEFT);
-		detachInterrupt(PIN_INTER_RIGHT);
-
-		attachInterrupt(PIN_INTER_LEFT, linterrupt, RISING);
-		attachInterrupt(PIN_INTER_RIGHT, rinterrupt, RISING);
-	}
-#endif
 	return (direct_right_default ? i : -i);
 }
 
