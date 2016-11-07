@@ -1,5 +1,7 @@
 #!/bin/bash
 
+pkill -9 minicom
+
 sed  -i -e s/#define\ AXIS.*/#define\ AXIS\ 0/ firmware.ino
 make ARDUINO_PORT=/dev/ArduinoX upload
 
