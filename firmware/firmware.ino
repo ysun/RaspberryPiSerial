@@ -111,7 +111,7 @@ long getCurPosReg() {
 }
 unsigned long do_run(unsigned long steps, unsigned long during_micro_second, bool direct_right_default)
 {
-	unsigned long i = 0, j = 0, k = 0;
+	unsigned long i = 0;
 
 	digitalWrite(PIN_DIR, !direct_right_default);
 
@@ -143,6 +143,7 @@ unsigned long do_run_interrupt(unsigned long steps, unsigned long during_micro_s
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second*10);
 	}
+	return (direct_right_default ? i : -i);
 }
 
 bool dir_left_or_right(long obj_distance) {
@@ -160,15 +161,15 @@ long pulse_to_m(long pulse) {
 }
 
 void printCurPos() {
-	Serial.print("cur pos:");
+	Serial.print("addtional:");
+	Serial.print(g_targetPos);
+	Serial.print(" cur pos:");
 	Serial.print(g_position);
 	Serial.print(" (");
 	Serial.print(EEPROM.read(REG_POS_HIGH));
 	Serial.print(" : ");
 	Serial.print(EEPROM.read(REG_POS_LOW));
-	Serial.print(" ) =");
-	Serial.print(g_targetPos);
-	Serial.print(" ) =");
+	Serial.print(" )");
 }
 
 void motor_run(long distance)
@@ -197,7 +198,7 @@ void motor_run(long distance)
 
 	printCurPos();
 
-	if(pulse_actual = 0 && !(inter_left || inter_right)) {
+	if(pulse_actual == 0 && !(inter_left || inter_right)) {
 		printLog("Motro moving check ERROR, run again!");
 		motor_run(distance);
 	}
@@ -214,7 +215,9 @@ void motor_run_interrupt(long distance)
 
 	pulse_actual = do_run_interrupt(pulse_total, g_pulseDelay, dir_left_or_right(distance));
 
-	updatePos( getCurPosReg() + pulse_actual);
+	if(g_needUpdatePos) {
+		updatePos( getCurPosReg() + pulse_actual);
+	}
 }
 void stop_motor()
 {
@@ -306,7 +309,6 @@ void setup() {
 }
 void printLog(const char str[])
 {
-	int i = 0;
 	Serial.print("\r\n[LOG]");
 	Serial.println(str);
 }
