@@ -162,14 +162,16 @@ long pulse_to_m(long pulse) {
 
 void printCurPos() {
 	Serial.print("addtional:");
+	Serial.print(pulse_to_m(g_targetPos));
+	Serial.print("(");
 	Serial.print(g_targetPos);
-	Serial.print(" cur pos:");
+	Serial.print(")     ");
+
+	Serial.print("cur pos:");
+	Serial.print(pulse_to_m(g_position));
+	Serial.print("(");
 	Serial.print(g_position);
-	Serial.print(" (");
-	Serial.print(EEPROM.read(REG_POS_HIGH));
-	Serial.print(" : ");
-	Serial.print(EEPROM.read(REG_POS_LOW));
-	Serial.print(" )");
+	Serial.print(")");
 }
 
 void motor_run(long distance)
@@ -183,6 +185,8 @@ void motor_run(long distance)
 	unsigned long pulse_total = long(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0)));
 
 	unsigned long pulse_actual = 0;
+
+	if(pulse_total == 0) return;
 	
 	//Enable motor, LOW means enabling.
 	digitalWrite(PIN_ENABLE,LOW);
@@ -233,6 +237,8 @@ void linterrupt()
 	g_inInterruptLeft = true;
 	
 	g_position = 0;
+	g_targetPos = 0;
+
 	EEPROM.write(REG_POS_LOW, 0);
 	EEPROM.write(REG_POS_HIGH, 0);
 	g_needUpdatePos = false;
@@ -268,10 +274,6 @@ void updatePos(long pos) {
 }
 
 void reset() {
-	if(AXIS == 2) {
-		motor_run(-50);
-		delay(100);
-	}
 	if(AXIS != 3)
 		motor_run(-1900);
 }
@@ -406,10 +408,9 @@ void processMotor()
 		case 'A':			//move:输入的x,y,z是绝对坐标
 			Serial.print("Here A ! para.d: pulse:");
 
-			g_targetPos = para[AXIS].d;
+			g_targetPos = m_to_pulse(para[AXIS].d);
 
 			distance = para[AXIS].d - pulse_to_m(getCurPosReg());
-			Serial.print(distance);
 
 			motor_run(distance);	//电机驱动
 
@@ -418,7 +419,7 @@ void processMotor()
 		case 'B':		      //move:输入的x,y,z是相对坐标
 			Serial.println("Here B moving!!!");
 
-			g_targetPos = para[AXIS].d + pulse_to_m(getCurPosReg());
+			g_targetPos = m_to_pulse(para[AXIS].d + pulse_to_m(getCurPosReg()));
 
 			distance = para[AXIS].d;
 			motor_run(distance);	//电机驱动
@@ -454,7 +455,6 @@ void processMotor()
 			}
 			break;
 		case 'R':
-			g_targetPos = 0;
 			g_pulseDelay = PULSE_DELAY_MAX;
 			reset();
 
