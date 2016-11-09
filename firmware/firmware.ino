@@ -24,7 +24,7 @@
 	#define PULSE_DELAY_DEFAULT 1500		//steps is 2000/r
 #elif AXIS == 1
 	#define TRAN_RATION 75
-	#define PULSE_DELAY_DEFAULT 500
+	#define PULSE_DELAY_DEFAULT 300
 #else
 	#define TRAN_RATION 95
 	#define PULSE_DELAY_DEFAULT 400
@@ -44,6 +44,8 @@
 #define REG_LEN_LOW 2
 #define REG_LEN_HIGH 3
 
+#define INTER_DELAY_RATION 3.0
+
 #define GET_POS_LOW(pos)	pos & MASK_POS_LOW
 #define GET_POS_HIGH(pos)	(pos & MASK_POS_HIGH) >> 8
 
@@ -53,6 +55,8 @@ void updatePos(long pos);
 long getCurPos();
 void motor_run(long distance);
 void printLog(const char str[]);
+long pulse_to_m(long pulse);
+unsigned long speedAdjust(unsigned long pulsDelay, unsigned int steps, bool DIRECT);
 
 int g_inputCount = 0;
 bool g_processFlag = false;
@@ -117,7 +121,11 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 
 	inter_left = inter_right = false; //just for interrupt!
 
-	for(i = 0; i < steps; i++)
+	i = speedAdjust(during_micro_second, steps, true);
+
+	unsigned long amendsteps = steps - i;
+
+	for(; i < amendsteps; i++)
 	{
 		if (inter_left || inter_right)
 			break;
@@ -127,6 +135,9 @@ unsigned long do_run(unsigned long steps, unsigned long during_micro_second, boo
 		digitalWrite(PIN_PULS, HIGH);
 		delayMicroseconds(during_micro_second);
 	}
+
+	i =i + speedAdjust(during_micro_second, steps, false);
+
 	return (direct_right_default ? i : -i);
 }
 
@@ -139,9 +150,9 @@ unsigned long do_run_interrupt(unsigned long steps, unsigned long during_micro_s
 	for(i = 0; i < steps; i++)
 	{
 		digitalWrite(PIN_PULS, LOW);
-		delayMicroseconds(during_micro_second*10);
+		delayMicroseconds(during_micro_second * INTER_DELAY_RATION);
 		digitalWrite(PIN_PULS, HIGH);
-		delayMicroseconds(during_micro_second*10);
+		delayMicroseconds(during_micro_second * INTER_DELAY_RATION);
 	}
 	return (direct_right_default ? i : -i);
 }
@@ -173,6 +184,25 @@ void printCurPos() {
 	Serial.print(g_position);
 	Serial.print(")");
 }
+unsigned long do_run_risk(unsigned long steps, unsigned long during_micro_second, bool direct_right_default)
+{
+	unsigned long i = 0;
+
+	digitalWrite(PIN_DIR, !direct_right_default);
+
+	for(i = 0; i < steps; i++)
+	{
+		if (inter_left || inter_right)
+			break;
+
+		digitalWrite(PIN_PULS, LOW);
+		delayMicroseconds(during_micro_second * INTER_DELAY_RATION);
+		digitalWrite(PIN_PULS, HIGH);
+		delayMicroseconds(during_micro_second * INTER_DELAY_RATION);
+	}
+	return (direct_right_default ? i : -i);
+}
+
 
 void motor_run(long distance)
 {
@@ -193,8 +223,20 @@ void motor_run(long distance)
 
 	g_needUpdatePos = true; //by defalut need update position after moving expect for interrupt triggered!
 	g_reachend = false;
-     
-	pulse_actual = do_run(pulse_total, g_pulseDelay, dir_left_or_right(distance));
+
+	//add movement area
+	long targetCoor = pulse_to_m(g_targetPos);
+	unsigned long extrem_total = 0;
+	unsigned long normalPulse = pulse_total;
+	if(targetCoor > 980 || targetCoor < 0) {
+		targetCoor = (targetCoor > 950) ? (targetCoor - 900) :(80 - targetCoor);
+		extrem_total = m_to_pulse(targetCoor);
+		normalPulse = pulse_total - extrem_total;
+	}
+
+	pulse_actual = do_run(normalPulse, g_pulseDelay, dir_left_or_right(distance));
+	pulse_actual = pulse_actual + do_run_risk(extrem_total,  g_pulseDelay, dir_left_or_right(distance));
+	//add movement area
 
 	if(g_needUpdatePos) {
 		updatePos( getCurPosReg() + pulse_actual);
@@ -274,8 +316,17 @@ void updatePos(long pos) {
 }
 
 void reset() {
-	if(AXIS != 3)
-		motor_run(-1900);
+	if(AXIS != 3) {
+		Serial.println("Here R moving!!!");
+		int distance = -1100;
+		g_targetPos = m_to_pulse(distance + pulse_to_m(getCurPosReg()));
+		Serial.print("g_targetPos");
+		Serial.println(pulse_to_m(g_targetPos));
+
+		motor_run(distance);	//电机驱动
+
+		Serial.println("Finished R moving!!!");
+	}
 }
 
 void setup() {
@@ -383,23 +434,38 @@ void parseData(unsigned char *comdata)
 	}
 	return;
 }
+unsigned long speedAdjust(unsigned long pulsDelay, unsigned int steps, bool DIRECT) {
+	int i = 0, j = 0, i_time = 0, j_time = 5;
+	float minRatio = 1.0;
+	float disRatio = 0.0;
+	float maxRatio = INTER_DELAY_RATION;
+	unsigned long tf = pulsDelay;
+	unsigned long count = 0;
 
-int speedUp(int countStep){   //chaning speed every 100 steps!
-      int i = 0;
-      float tdelay = 350;
-      for(i = 0; i < countStep; i++)
-      {
-	    for(int j = 0; j < 100; j++){
-		    digitalWrite(PIN_PULS, LOW);
-		    delayMicroseconds(int(tdelay));
-		    digitalWrite(PIN_PULS, HIGH);
-		    delayMicroseconds(int(tdelay));
-	    }
-	    tdelay = tdelay - 6.25;
-      }
-      return tdelay;
+	unsigned int delaySteps = (steps > 200) ? 100 : int(0.5 * steps);
+	i_time = delaySteps / j_time;
+	disRatio = (DIRECT ? (minRatio - maxRatio):(maxRatio - minRatio)) / i_time;
+
+	float ratio =DIRECT ? maxRatio:minRatio;
+
+	for(i = 0; i < i_time; i++) {
+		ratio = ratio + disRatio;
+		tf = long(pulsDelay * ratio);
+
+		for(j = 0; j < j_time; j++) {
+			if (inter_left || inter_right)
+				return count;
+
+			digitalWrite(PIN_PULS, LOW);
+			delayMicroseconds(tf);
+			digitalWrite(PIN_PULS, HIGH);
+			delayMicroseconds(tf);
+			count++;
+		}
+	}
+
+	return count;
 }
-
 void processMotor()
 {
 	long distance = 0;
@@ -420,6 +486,8 @@ void processMotor()
 			Serial.println("Here B moving!!!");
 
 			g_targetPos = m_to_pulse(para[AXIS].d + pulse_to_m(getCurPosReg()));
+			Serial.print("g_targetPos");
+			Serial.println(pulse_to_m(g_targetPos));
 
 			distance = para[AXIS].d;
 			motor_run(distance);	//电机驱动
@@ -455,7 +523,6 @@ void processMotor()
 			}
 			break;
 		case 'R':
-			g_pulseDelay = PULSE_DELAY_MAX;
 			reset();
 
 			break;
