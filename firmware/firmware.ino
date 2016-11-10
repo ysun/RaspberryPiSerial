@@ -216,7 +216,7 @@ void motor_run(long distance)
 			Serial.println("right overflow!!!");
 		}
 	}
-	unsigned long pulse_total = long(round(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0))));
+	unsigned long pulse_total = abs(m_to_pulse(distance));
 
 	unsigned long pulse_actual = 0;
 
