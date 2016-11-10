@@ -20,8 +20,8 @@
 #define ANTI_SHAKE_STEPS 10
 
 #if AXIS == 3		//For clond-platform
-	#define TRAN_RATION 45			//360/(2000/400)
-	#define PULSE_DELAY_DEFAULT 1500		//steps is 2000/r
+	#define TRAN_RATION 22.5			//360/(6400/400)
+	#define PULSE_DELAY_DEFAULT 1000		//steps is 4000/r
 #elif AXIS == 1
 	#define TRAN_RATION 75
 	#define PULSE_DELAY_DEFAULT 300
@@ -207,12 +207,16 @@ unsigned long do_run_risk(unsigned long steps, unsigned long during_micro_second
 void motor_run(long distance)
 {
 	if(AXIS == 3) {
-		if(distance >= 180)
-			distance =180;
-		if(distance <= -180)
-			distance = -180;
+		if(pulse_to_m(g_targetPos) >= 180) {
+			distance =180 - pulse_to_m(g_position);
+			Serial.println("left overflow!!!");
+		}
+		if(pulse_to_m(g_targetPos) <= -180) {
+			distance = -180 - pulse_to_m(g_position);
+			Serial.println("right overflow!!!");
+		}
 	}
-	unsigned long pulse_total = long(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0)));
+	unsigned long pulse_total = long(round(abs(distance) * (long(PULSE_RATE) / (TRAN_RATION * 1.0))));
 
 	unsigned long pulse_actual = 0;
 
@@ -224,11 +228,17 @@ void motor_run(long distance)
 	g_needUpdatePos = true; //by defalut need update position after moving expect for interrupt triggered!
 	g_reachend = false;
 
+	Serial.print("pulse_total: ");
+	Serial.print(pulse_total);
+	Serial.print("  distance: ");
+	Serial.println(distance);
+
+
 	//add movement area
 	long targetCoor = pulse_to_m(g_targetPos);
 	unsigned long extrem_total = 0;
 	unsigned long normalPulse = pulse_total;
-	if(targetCoor > 980 || targetCoor < 0) {
+	if((AXIS != 3) && (targetCoor > 980 || targetCoor < 0)) {
 		targetCoor = (targetCoor > 950) ? (targetCoor - 900) :(80 - targetCoor);
 		extrem_total = m_to_pulse(targetCoor);
 		normalPulse = pulse_total - extrem_total;
@@ -326,6 +336,14 @@ void reset() {
 		motor_run(distance);	//电机驱动
 
 		Serial.println("Finished R moving!!!");
+	}
+	else {
+		g_position = 0;
+		g_targetPos = 0;
+
+		EEPROM.write(REG_POS_LOW, 0);
+		EEPROM.write(REG_POS_HIGH, 0);
+		g_needUpdatePos = false;
 	}
 }
 
