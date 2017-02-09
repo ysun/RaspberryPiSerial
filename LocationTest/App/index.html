@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>LocationTest</title>
+    <script type="text/javascript" src="TL.js"></script>
+  </head>
+  <body>
+    <h1 align="center">空间定位测试</h1>
+
+<form>
+<font color="#00F" size="5">头盔</font> 
+<br>
+绝对坐标
+<input type="radio" name="helmet" id="absolute1" value="A" />
+相对坐标
+<input type="radio" checked="checked" name="helmet" id="relative1" value="B" />
+<br>
+X:<input type="text" id="textfiled0" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+Y:<input type="text" id="textfiled1" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+Z:<input type="text" id="textfiled2" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+W:<input type="text" id="textfiled3" size="10" maxlength="20" title="请输入头盔旋转的值，符号表示旋转方向">
+<br>
+<input type="button" value="执行" onclick="Test1()" accesskey="h" title="快捷键:Alt+h"/>
+<input type="button" value="添加" onclick="Add1()" accesskey="a" title="快捷键:Alt+a"/>
+<br>
+<br>
+
+<font color="#00F" size="5">手柄</font> 
+<br>
+绝对坐标
+<input type="radio" name="joystick" id="absolute2" value="A" />
+相对坐标
+<input type="radio" checked="checked" name="joystick" id="relative2" value="B" />
+<br>
+X:<input type="text" id="textfiled4" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+Y:<input type="text" id="textfiled5" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+Z:<input type="text" id="textfiled6" size="10" maxlength="20" title="请输入-1000-1000内的坐标值">
+W:<input type="text" id="textfiled7" size="10" maxlength="20" title="请输入手柄旋转的值，符号表示旋转方向">
+<br>
+<input type="button" value="执行" onclick="Test2()" accesskey="j" title="快捷键:Alt+j"/>
+<input type="button" value="添加" onclick="Add2()" accesskey="b" title="快捷键:Alt+b"/>
+<br>
+<br>
+<hr style="height:1px;border:none;border-top:1px solid #555555;" />
+待执行命令
+<br>
+<textarea name="textarea" id="textarea" cols="20" rows="5"></textarea>
+循环<input type="text" id="textfiled8" size="3" maxlength="20" value="1">次
+<br>
+<br>
+<div align="center"><input type="button" value="开始执行" onclick="Test()" accesskey="t" title="快捷键:Alt+u"/></div>
+<p>         </p>
+
+</form>
+
+  </body>
+</html>

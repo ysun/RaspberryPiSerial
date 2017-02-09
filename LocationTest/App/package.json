@@ -1,0 +1,7 @@
+{
+  "name": "LocationTest",
+  "main": "index.html",
+"window":{
+"toolbar":false
+}
+}
